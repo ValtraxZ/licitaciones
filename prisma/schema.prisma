@@ -1,0 +1,244 @@
+// ---------------------------------------------------------------------------
+// Sistema de Gestión de Licitaciones — modelo de datos
+//
+// Convenciones:
+//  - Montos SIEMPRE en enteros (centavos). Nunca float: 0.1 + 0.2 !== 0.3 en IEEE 754.
+//  - Estados como enum de Postgres, no VARCHAR: la base impide estados inválidos.
+//  - Toda entidad tiene auditoría (quién creó/modificó y cuándo).
+//  - Los "from" de auditoría son SetNull: si se da de baja un usuario, el registro
+//    histórico NO puede romperse (auditoría real, no un log decorativo).
+// ---------------------------------------------------------------------------
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────── ENUMS ───────────────────────────────
+
+enum Rol {
+  ADMIN
+  USER
+}
+
+enum EstadoLicitacion {
+  borrador // implícito: creada y todavía no enviada al cliente
+  activa // enviada formalmente al cliente
+  finalizada // ganada y con entrega completada
+  por_cobrar // facturada, pendiente de cobro
+  cobrada // saldo pendiente en cero
+  perdida // no ganada (manual o por vencimiento automático)
+}
+
+enum OrigenTransicion {
+  manual // disparada por un usuario
+  automatica // disparada por el job (vencimiento por fecha límite)
+  sistema // disparada por una regla de negocio (saldo en cero)
+}
+
+// ─────────────────────────────── USUARIO ───────────────────────────────
+
+model Usuario {
+  id           String  @id @default(cuid())
+  email        String  @unique
+  passwordHash String
+  nombre       String
+  rol          Rol     @default(USER)
+  activo       Boolean @default(true)
+
+  creadoPorId    String?
+  creadoEn       DateTime @default(now())
+  actualizadoPorId String?
+  actualizadoEn  DateTime @updatedAt
+
+  // Relaciones de auditoría hacia sí mismo
+  creadoPor     Usuario?  @relation("UsuarioCreadoPor", fields: [creadoPorId], references: [id], onDelete: SetNull)
+  creadoPorUsuarios Usuario[] @relation("UsuarioCreadoPor")
+
+  // Relaciones de auditoría desde otras entidades
+  clientesCreados       Cliente[]       @relation("ClienteCreadoPor")
+  clientesActualizados  Cliente[]       @relation("ClienteActualizadoPor")
+  productosCreados      Producto[]      @relation("ProductoCreadoPor")
+  productosActualizados Producto[]      @relation("ProductoActualizadoPor")
+  licitacionesCreadas   Licitacion[]    @relation("LicitacionCreadoPor")
+  licitacionesActualizadas Licitacion[] @relation("LicitacionActualizadoPor")
+  pagosRegistrados      Pago[]          @relation("PagoRegistradoPor")
+  historial             HistorialTransicion[] @relation("HistorialUsuario")
+}
+
+model Cliente {
+  id          String  @id @default(cuid())
+  nombre      String
+  razonSocial String?
+  // Email de la EMPRESA CLIENTE: es el destinatario real de las propuestas y recordatorios.
+  email       String
+  telefono    String?
+
+  creadoPorId      String?
+  creadoEn         DateTime @default(now())
+  actualizadoPorId String?
+  actualizadoEn    DateTime @updatedAt
+
+  creadoPor     Usuario? @relation("ClienteCreadoPor", fields: [creadoPorId], references: [id], onDelete: SetNull)
+  actualizadoPor Usuario? @relation("ClienteActualizadoPor", fields: [actualizadoPorId], references: [id], onDelete: SetNull)
+
+  licitaciones Licitacion[]
+
+  @@index([email])
+}
+
+// ─────────────────────────────── PRODUCTO ───────────────────────────────
+
+model Producto {
+  id             String  @id @default(cuid())
+  sku            String  @unique
+  nombre         String
+  descripcion    String?
+  precioUnitario Int // centavos
+  activo         Boolean @default(true)
+
+  creadoPorId      String?
+  creadoEn         DateTime @default(now())
+  actualizadoPorId String?
+  actualizadoEn    DateTime @updatedAt
+
+  creadoPor     Usuario? @relation("ProductoCreadoPor", fields: [creadoPorId], references: [id], onDelete: SetNull)
+  actualizadoPor Usuario? @relation("ProductoActualizadoPor", fields: [actualizadoPorId], references: [id], onDelete: SetNull)
+
+  licitaciones LicitacionProducto[]
+}
+
+// ─────────────────────────────── LICITACIÓN ───────────────────────────────
+
+model Licitacion {
+  id     String @id @default(cuid())
+  codigo String @unique // "LIC-2026-0001", legible en el correo y en la auditoría
+  titulo String
+  descripcion String?
+
+  clienteId String
+  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+
+  // presupuestoMaximo es el límite de la Regla 1 (nunca se puede superar el total de productos)
+  presupuestoMaximo Int // centavos
+  fechaLimite       DateTime
+
+  estado EstadoLicitacion @default(borrador)
+
+  // Cache desnormalizado del total de productos. Se actualiza en la misma transacción que
+  // la tabla puente, para validar el presupuesto sin un SUM() en cada request.
+  totalProductos Int @default(0)
+
+  // Total facturado. Distinto de totalProductos: se puede presupuestar 1.000.000 y
+  // facturar 950.000 con un descuento negociado. Es la base del cálculo de saldo (Regla 6).
+  montoFacturado Int @default(0)
+
+  // Documento de propuesta en Supabase Storage
+  documentoPath   String? // clave del objeto dentro del bucket (para borrar / firmar)
+  documentoUrl    String? // URL real y accesible (evidencia del enunciado)
+  documentoNombre String?
+  documentoMime   String?
+  documentoTamano Int?
+
+  // Marca de idempotencia del recordatorio: sin esto el cron bombardea al cliente (Regla 5).
+  recordatorioEnviadoEn DateTime?
+
+  // Timestamps contextuales. enviadaEn ≠ creadoEn: para auditar "se envió antes del plazo"
+  // hay que saber CUÁNDO se envió, no cuándo se creó.
+  enviadaEn  DateTime?
+  resueltaEn DateTime? // finalizada | perdida
+  cerradaEn  DateTime? // cobrada | perdida
+
+  creadoPorId      String?
+  creadoEn         DateTime @default(now())
+  actualizadoPorId String?
+  actualizadoEn    DateTime @updatedAt
+
+  creadoPor     Usuario? @relation("LicitacionCreadoPor", fields: [creadoPorId], references: [id], onDelete: SetNull)
+  actualizadoPor Usuario? @relation("LicitacionActualizadoPor", fields: [actualizadoPorId], references: [id], onDelete: SetNull)
+
+  productos LicitacionProducto[]
+  pagos     Pago[]
+  historial HistorialTransicion[]
+
+  // Índice compuesto: es exactamente el WHERE del job programado (Regla 2).
+  @@index([estado, fechaLimite])
+  @@index([clienteId])
+}
+
+// ─────────────────────── LICITACIÓN ↔ PRODUCTO (N:M) ───────────────────────
+
+model LicitacionProducto {
+  id           String @id @default(cuid())
+  licitacionId String
+  productoId   String
+
+  cantidad Int
+  // El precio queda CONGELADO al agregar el ítem. Si mañana se reprecia el catálogo,
+  // una licitación de hace 6 meses debe seguir mostrando el precio con el que se presupuestó.
+  precioUnitario Int
+  subtotal      Int // cantidad * precioUnitario (centavos)
+
+  creadoEn     DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  licitacion Licitacion @relation(fields: [licitacionId], references: [id], onDelete: Cascade)
+  producto   Producto   @relation(fields: [productoId], references: [id], onDelete: Restrict)
+
+  // Un producto no se agrega dos veces en la misma licitación: el alta repetida actualiza el ítem.
+  @@unique([licitacionId, productoId])
+  @@index([licitacionId])
+}
+
+// ─────────────────────────────── PAGOS ───────────────────────────────
+
+model Pago {
+  id           String @id @default(cuid())
+  licitacionId String
+
+  monto      Int // centavos
+  metodo     String // transferencia | efectivo | tarjeta
+  referencia String? // número de comprobante / transferencia
+  notas      String?
+
+  fechaPago     DateTime @default(now())
+  registradoPorId String?
+  creadoEn       DateTime @default(now())
+
+  licitacion   Licitacion @relation(fields: [licitacionId], references: [id], onDelete: Cascade)
+  registradoPor Usuario?  @relation("PagoRegistradoPor", fields: [registradoPorId], references: [id], onDelete: SetNull)
+
+  @@index([licitacionId])
+}
+
+// ─────────────────── HISTORIAL DE TRANSICIONES ───────────────────
+
+model HistorialTransicion {
+  id           String @id @default(cuid())
+  licitacionId String
+
+  estadoAnterior EstadoLicitacion
+  estadoNuevo    EstadoLicitacion
+
+  // Distingue "el usuario la marcó perdida" de "se venció sola" (Regla 2) y de
+  // "el saldo llegó a cero" (Regla 6). Requisito evaluable, no cosmético.
+  origen OrigenTransicion @default(manual)
+
+  // Null cuando la transición la hizo el job: no hay usuario. Dejarlo null es honesto.
+  usuarioId String?
+  // Snapshot del email: el historial sobrevive aunque el usuario se borre o cambie de email.
+  usuarioEmail String?
+
+  comentario String?
+  createdAt  DateTime @default(now())
+
+  licitacion Licitacion @relation(fields: [licitacionId], references: [id], onDelete: Cascade)
+  usuario    Usuario?   @relation("HistorialUsuario", fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  @@index([licitacionId, createdAt])
+}
