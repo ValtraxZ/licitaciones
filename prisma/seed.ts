@@ -15,26 +15,30 @@ const prisma = new PrismaClient();
  */
 
 async function main() {
-  const passwordHash = await bcrypt.hash("Admin123!", 10);
+  // Se hashean las DOS contraseñas por separado. Reutilizar el mismo hash en el
+  // `update` de los dos usuarios dejaba al USER con la contraseña del ADMIN después
+  // de cada re-seed: el login de `user@demo.com` fallaba sin explicación clara.
+  const hashAdmin = await bcrypt.hash("Admin123!", 10);
+  const hashUser = await bcrypt.hash("User123!", 10);
 
   const admin = await prisma.usuario.upsert({
     where: { email: "admin@demo.com" },
-    update: { passwordHash, rol: "ADMIN" },
+    update: { passwordHash: hashAdmin, rol: "ADMIN" },
     create: {
       email: "admin@demo.com",
       nombre: "Administrador Demo",
-      passwordHash,
+      passwordHash: hashAdmin,
       rol: "ADMIN",
     },
   });
 
   const user = await prisma.usuario.upsert({
     where: { email: "user@demo.com" },
-    update: { passwordHash, rol: "USER" },
+    update: { passwordHash: hashUser, rol: "USER" },
     create: {
       email: "user@demo.com",
       nombre: "Usuario Demo",
-      passwordHash: await bcrypt.hash("User123!", 10),
+      passwordHash: hashUser,
       rol: "USER",
     },
   });
@@ -42,11 +46,18 @@ async function main() {
   // ── Clientes ───────────────────────────────────────────────────────────────
   // El `email` es el DESTINATARIO REAL del correo de propuesta y del recordatorio.
   // ⚠️  Cambiá estos emails por los tuyos para poder recibir los correos de prueba.
+  // `EMAIL_CLIENTE_DEMO` apunta el cliente de prueba a tu propio email. Hace falta
+  // porque con el remitente `onboarding@resend.dev` (plan gratuito, sin dominio
+  // verificado) Resend UNICAMENTE permite enviar al email de la cuenta titular:
+  //   "You can only send testing emails to your own email address".
+  // Para enviar a cualquier destinatario hay que verificar un dominio propio.
+  const emailDemo = process.env.EMAIL_CLIENTE_DEMO ?? "clientes@demo.com";
+
   const clientes: Prisma.ClienteCreateInput[] = [
     {
       nombre: "Constructora del Sur S.R.L.",
       razonSocial: "Constructora del Sur S.R.L.",
-      email: "compras@constructoradelsur.com",
+      email: emailDemo,
       telefono: "+54 11 4000-0000",
       creadoPor: { connect: { id: admin.id } },
     },

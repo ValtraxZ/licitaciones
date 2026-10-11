@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import { calcularSaldo, presupuestoDisponible } from "@/lib/reglas";
 import { requireUserPagina } from "@/lib/session";
@@ -17,6 +18,22 @@ import {
 } from "./controles";
 
 export const dynamic = "force-dynamic";
+
+/** El título se arma acá porque depende del dato; `params` es una Promise en Next 16. */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const licitacion = await prisma.licitacion.findUnique({
+    where: { id },
+    select: { codigo: true, titulo: true },
+  });
+  return {
+    title: licitacion ? `${licitacion.codigo} — ${licitacion.titulo}` : "Licitación",
+  };
+}
 
 export default async function DetalleLicitacion({ params }: { params: Promise<{ id: string }> }) {
   await requireUserPagina();

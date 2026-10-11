@@ -11,6 +11,8 @@
  * Los montos se expresan en CENTAVOS en toda la API: 1.500.000 = $15.000,00
  */
 
+export {};
+
 const BASE = process.env.SMOKE_BASE_URL ?? "http://localhost:3000";
 const CRON_SECRET = process.env.CRON_SECRET ?? "";
 
