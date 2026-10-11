@@ -92,37 +92,59 @@ src/proxy.ts              protección de rutas
 
 ## Estado actual
 
-Proyecto: Supabase `bdexhlcebqhrgwhgppdn`, región declarada **us-west-2**, PostgreSQL 14.18,
-activo (la secret key responde 200 en `/rest/v1/`).
+Proyecto: Supabase `bdexhlcebqhrgwhgppdn`, **región us-west-2, pooler `aws-1-us-west-2`**,
+PostgreSQL 17.11. **CONEXIÓN RESUELTA** ✅
 
-- [x] Proyecto Next.js 16.4.0 creado, dependencias instaladas
+- [x] Proyecto Next.js 16.4.0 + TypeScript + Prisma 6.19
 - [x] `next.config.ts` con `cacheComponents: false` documentado
 - [x] `prisma/schema.prisma` completo (6 entidades, auditoría, índices)
-- [x] `prisma.config.ts` + `.env` + `.env.example` + `.gitignore` corregido
-- [x] `src/lib/db.ts` singleton, `prisma/seed.ts`
-- [x] Claves de Supabase cargadas (`sb_publishable_` / `sb_secret_`) y verificadas
-- [ ] **BLOQUEADO: `DATABASE_URL` / `DIRECT_URL`.** Ver abajo.
-- [ ] `src/lib/estados.ts`, `transiciones.ts`, `reglas.ts`
-- [ ] Auth (`session.ts`, `proxy.ts`, login)
-- [ ] CRUD clientes/productos/usuarios
-- [ ] Licitaciones + productos + presupuesto
-- [ ] Storage + envío con email
-- [ ] Pagos + cron
-- [ ] UI + deploy + README
+- [x] `prisma.config.ts` + `.env` + `.env.example` + `.gitignore`
+- [x] `src/lib/db.ts` singleton, `prisma/seed.ts` (idempotente)
+- [x] Claves de Supabase y pooler cargadas
+- [x] **`prisma db push` aplicado + seed corrido** (2 clientes, 4 productos, 2 usuarios)
+- [x] **Núcleo de reglas de negocio**: `estados.ts`, `reglas.ts`, `transiciones.ts`,
+      `licitaciones/productos.ts`, `licitaciones/pagos.ts` — **46 tests pasando**
+- [x] **Auth completa**: `token.ts`, `session.ts`, `passwords.ts`, `proxy.ts`,
+      `api/auth/{login,logout,me}` — verificada end-to-end
+- [ ] CRUD clientes / productos / usuarios (solo admin crea usuarios)
+- [ ] Endpoints de licitaciones (crear, detalle, productos, enviar, resolver, facturar, pagos)
+- [ ] Storage + envío con email real y adjunto
+- [ ] Job programado (vencimiento + recordatorio)
+- [ ] UI + deploy + README + evidencia
 
-### Diagnóstico de la base de datos (resuelto, documentado en `.env`)
+### Trampa del pooler de Supabase (no volver a picar)
 
-- La conexión **directa** `db.<ref>.supabase.co` resuelve **solo a IPv6** (AAAA) y esta máquina
-  **no tiene ruta IPv6 a Internet** (`Get-NetRoute -AddressFamily IPv6 ::/0` vacío) → `P1001`
-  siempre. Inusable en local. Imposible arreglar desde el código.
-- El **pooler** `aws-0-<region>.pooler.supabase.com` resuelve a IPv4 y el puerto 5432 responde,
-  pero este proyecto usa el pooler **nuevo**: con `postgres.<ref>` responde
-  `tenant/user not found` y con `postgres` responde
-  `no tenant identifier provided (external_id or sni_hostname required)`.
-  Se barrieron las 19 regiones de Supabase con reintentos y ninguna acepta esos dos formatos.
-- **Acción pendiente del usuario:** copiar la cadena de la pestaña **"Session pooler"** del
-  dashboard (Supabase → Project Settings → Database → Connection string), con la contraseña puesta.
-- Barato de reintentar si vuelve a fallar: `npx prisma db push` con la variable ya cargada.
+El host del pooler es **`aws-1-us-west-2.pooler.supabase.com`**. El prefijo es `aws-1`,
+NO `aws-0`. Ese `aws-1` es específico del proyecto y **no se puede adivinar**: con `aws-0`
+el pooler responde `tenant/user <ref> not found` aunque usuario, contraseña y región sean
+correctos. La región sola tampoco alcanza: hay que copiar la cadena del dashboard
+(Supabase → Project Settings → Database → Connection string).
+
+Además: la conexión directa `db.<ref>.supabase.co` es **inusable en local** (solo IPv6, y
+esta máquina no tiene ruta IPv6 a Internet). `DIRECT_URL` también apunta al pooler por eso.
+
+### Verificado end-to-end
+
+| Prueba | Resultado |
+|---|---|
+| login password incorrecta | 401 `NO_AUTENTICADO` |
+| login email inexistente | 401, **mensaje idéntico** (no enumera usuarios) |
+| login admin correcto | 200 + cookie httpOnly |
+| `/api/auth/me` con sesión | 200 con rol |
+| `/api/auth/me` sin sesión | 200 `data: null` |
+| `/dashboard` sin sesión | 307 → `/login?next=%2Fdashboard` |
+| `/licitaciones` sin sesión | 307 → `/login?next=%2Flicitaciones` |
+| `/dashboard` con cookie válida | 200, muestra nombre y rol |
+| `/dashboard` con cookie falsificada | 307 → login (la firma se verifica) |
+
+### Cuentas de prueba
+
+`admin@demo.com / Admin123!` (ADMIN) · `user@demo.com / User123!` (USER)
+
+### Diagnóstico de la base de datos (RESUELTO)
+
+Ver la sección "Trampa del pooler" más abajo. `DATABASE_URL` y `DIRECT_URL` ya funcionan
+y apuntan a `aws-1-us-west-2.pooler.supabase.com`.
 
 
 ## Notas de seguridad
@@ -130,3 +152,13 @@ activo (la secret key responde 200 en `/rest/v1/`).
 - La contraseña de la base aparece en este chat. **Rotarla antes de publicar el repo.**
 - `.env` está en `.gitignore`; `.env.example` sí va commiteado.
 - `SUPABASE_SERVICE_ROLE_KEY` nunca con `NEXT_PUBLIC_`.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+## This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
