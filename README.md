@@ -1,36 +1,320 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sistema de Gestión de Licitaciones
 
-## Getting Started
+Aplicación para administrar licitaciones comerciales de punta a punta: se redacta una
+licitación, se le adjunta una propuesta, **se envía formalmente al cliente por correo con
+el PDF adjunto**, se le hace seguimiento hasta su fecha límite con recordatorios, se resuelve
+(ganada o perdida) y, si se ganó, se factura y cobra hasta saldar. Todo auditado paso a paso.
 
-First, run the development server:
+![Panel de próximas a vencer](evidencia/02-panel-proximas-a-vencer.png)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+---
+
+## 1. Qué hace
+
+```
+   crear borrador  →  agregar productos  →  subir PDF  →  ENVIAR
+        (estado         (valida            (Storage)     (correo real
+        borrador)        presupuesto)                    + adjunto)
+                                                              │
+                        ┌─────────────────────────────────────┘
+                        ▼
+              recordatorios a < 48 h de vencerse  (job programado)
+                        │
+        ┌───────────────┴───────────────┐
+        ▼                               ▼
+  perdida (venció)            finalizada (ganada)
+                                        │
+                                        ▼
+                                  por_cobrar ──pagos──▶ cobrada
+                                                   (automático al saldar)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Cada flecha es una transición **validada contra una tabla** y **registrada en el historial**
+con estado anterior, estado nuevo, usuario, origen y fecha.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 2. Stack
 
-## Learn More
+| Capa | Elección | Por qué |
+|---|---|---|
+| Framework | **Next.js 16.4** (App Router) + TypeScript | API + UI + job programado en un solo repo |
+| Base de datos | **Supabase PostgreSQL 17** (plan free) | El enunciado lo permite; la máquina de desarrollo no tiene Docker |
+| ORM | **Prisma 6** | Migraciones y tipos generados |
+| Auth | **JWT en cookie httpOnly** con `jose` | ~40 líneas explicables, sin beta de librerías |
+| Email | **Resend** (plan free) | Adjuntos reales vía `attachments` |
+| Archivos | **Supabase Storage**, bucket privado `propuestas` | URL firmada real y revocable |
+| Job | **Endpoint HTTP** + Vercel Cron / GitHub Actions | El transporte es intercambiable |
+| Tests | **Vitest** (unitarios) + **script de humo** (end-to-end) | Las reglas críticas se prueban sin base de datos |
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 3. Instalación local
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Requisitos: **Node 20.9+** (probado en 22.14). No hace falta Docker ni Python.
 
-## Deploy on Vercel
+```bash
+git clone <url-del-repo>
+cd licitaciones
+npm install
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# 1. Copiar la plantilla de variables y completarla
+cp .env.example .env       # Windows: Copy-Item .env.example .env
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# 2. Aplicar el schema a la base
+npx prisma db push
+
+# 3. Cargar los datos de prueba (usuarios, clientes, productos)
+npm run db:seed
+
+# 4. Crear el bucket de Storage (privado, 10 MB, PDF/DOC/DOCX)
+npm run storage:setup
+
+# 5. Levantar
+npm run dev
+```
+
+Abrir <http://localhost:3000>.
+
+### Cuentas de prueba
+
+| Email | Contraseña | Rol |
+|---|---|---|
+| `admin@demo.com` | `Admin123!` | ADMIN |
+| `user@demo.com` | `User123!` | USER |
+
+---
+
+## 4. Variables de entorno
+
+| Variable | Para qué sirve | Nota |
+|---|---|---|
+| `DATABASE_URL` | Conexión de la app | **Pooler** de Supabase. Vercel corre en serverless: sin pooler se agota el límite de conexiones |
+| `DIRECT_URL` | Migraciones | Conexión directa. `prisma migrate` usa siempre `directUrl` si está declarado |
+| `AUTH_SECRET` | Firma el JWT | Sin ella, `encode(undefined)` firmaría con clave vacía y cualquiera podría forjar un rol ADMIN |
+| `CRON_SECRET` | Protege `/api/cron/licitaciones` | Vercel lo manda automático si la variable existe con ese nombre |
+| `RESEND_API_KEY` | Proveedor de email | Sin esto el envío **falla con error**, no se simula |
+| `EMAIL_FROM` | Remitente | `onboarding@resend.dev` o un dominio verificado |
+| `EMAIL_CLIENTE_DEMO` | Email del cliente de prueba | Ver sección de Resend más abajo |
+| `NEXT_PUBLIC_SUPABASE_URL` / `_ANON_KEY` | Cliente de Storage | `anon` respeta RLS |
+| `SUPABASE_SERVICE_ROLE_KEY` | Subida de archivos | Ignora RLS. **Nunca** con `NEXT_PUBLIC_` |
+
+Generar secretos:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
+### ⚠️ Trampa del pooler de Supabase
+
+El host del pooler es **`aws-1-us-west-2.pooler.supabase.com`**: el prefijo es `aws-1`,
+**no** `aws-0`. Ese `aws-1` es específico del proyecto y no se puede deducir; con `aws-0` el
+pooler responde `tenant/user <ref> not found` aunque usuario, contraseña y región sean
+correctos. Hay que copiar la cadena desde **Project Settings → Database → Connection string**.
+
+Además, la conexión directa `db.<ref>.supabase.co` resuelve **solo a IPv6**. En una red sin
+salida IPv6 falla siempre con `P1001`, por eso ambas variables apuntan al pooler.
+
+---
+
+## 5. Correo: qué permite el plan gratuito
+
+Con el remitente `onboarding@resend.dev`, Resend **solo permite enviar al email de la cuenta
+titular**:
+
+> You can only send testing emails to your own email address (…). To send emails to other
+> recipients, please verify a domain at resend.com/domains.
+
+Por eso `EMAIL_CLIENTE_DEMO` apunta el cliente de prueba a ese mismo email. Para enviar a
+destinatarios reales hay que **verificar un dominio** en [resend.com/domains](https://resend.com/domains)
+(agregar un registro TXT en DNS, minutos u horas) y cambiar `EMAIL_FROM` a ese dominio. Ninguna
+línea de código cambia: ya usa `process.env.EMAIL_FROM`.
+
+---
+
+## 6. Reglas de negocio: dónde vive cada una
+
+| Requisito | Implementación | Cómo se verifica |
+|---|---|---|
+| R1 · No exceder el presupuesto máximo | `assertDentroDePresupuesto` + `agregarProducto` (transaccional) | Agregar producto que desborda → `422 PRESUPUESTO_EXCEDIDO` |
+| R2 · Vencimiento automático | `api/cron/licitaciones`, paso 1 | Correr el cron con una activa vencida → queda `perdida`, `origen: automatica` |
+| R3 · No enviar sin documento | `assertTieneDocumento` (valida `documentoPath`) | Enviar sin subir PDF → `422 DOCUMENTO_FALTANTE` |
+| R4 · Correo real con adjunto | `email/enviar-propuesta.ts` | Correo recibido con el PDF visible |
+| R5 · Recordatorio < 48 h | Mismo cron, paso 2 | Activa a 30 h → llega recordatorio; a 5 días → no |
+| R6 · Pagos y paso a `cobrada` | `registrarPago` con `SELECT ... FOR UPDATE` | Saldo a cero → `cobrada` sola, `origen: sistema` |
+| R7 · Historial de toda transición | `cambiarEstado()` escribe el historial en la misma transacción | `GET .../historial` |
+| Solo `borrador` y `activa` aceptan productos | `assertEditable` | Agregar en `finalizada` → `409` |
+| Solo admin crea usuarios | `requireAdmin()` en el endpoint **y** en la página | `POST /api/usuarios` como user → `403` |
+
+---
+
+## 7. Arquitectura
+
+```
+Navegador
+   │
+   ▼
+src/proxy.ts                 verifica el JWT y redirige (optimización de UX)
+   │
+   ▼
+src/app/api/**/route.ts      valida input con Zod, llama a lib/, traduce errores
+   │                         ← CERO lógica de negocio en las rutas
+   ▼
+src/lib/reglas.ts            funciones PURAS: presupuesto, saldo, documento, estados
+src/lib/transiciones.ts      cambiarEstado(): único punto que escribe `estado`
+   │
+   ▼
+src/lib/db.ts ──────────► PostgreSQL (Supabase)
+
+Fuera de la transacción de DB:
+src/lib/email/*           Resend (correo + adjunto)
+src/lib/storage.ts        Supabase Storage (bucket privado)
+```
+
+**Por qué las reglas son funciones puras:** se testean sin base de datos. `estados.test.ts`
+recorre las **36 combinaciones** de estado usando la tabla del enunciado escrita a mano como
+especificación ejecutable: si alguien "arregla" la tabla, el test falla.
+
+**Por qué el frontend no reimplementa la tabla de estados:** `GET /api/licitaciones/:id`
+devuelve `transicionesDisponibles` y `editable`, calculados por el servidor. La UI dibuja
+los botones a partir de eso. Si el frontend tuviera su propia copia, el día que se agregue un
+estado mostraría un botón que el backend rechaza con 422.
+
+---
+
+## 8. Decisiones de diseño
+
+**Montos en enteros (centavos).** `0.1 + 0.2 !== 0.3` en IEEE 754. Un saldo con float termina
+con diferencias de un centavo y tests que fallan sin explicación. Todo se guarda y se calcula
+como entero; `Intl.NumberFormat` solo formatea para mostrar.
+
+**`SELECT ... FOR UPDATE` en los pagos.** Sin ese lock, dos requests de pago simultáneos leen
+el **mismo** saldo, los dos validan y los dos insertan: cobrás el doble de lo facturado.
+`FOR UPDATE` bloquea la fila de la licitación hasta que la transacción termine.
+
+**Reclamo atómico en el recordatorio.** El cron marca `recordatorioEnviadoEn` con un
+`updateMany` filtrando por el mismo `null`. Dos ejecuciones solapadas ven ambas `null`, pero
+solo una obtiene `count: 1`; la otra se saltea. Con `find` + `update` llegarían dos correos.
+
+**El correo va después de la transición, fuera de la transacción.** Si transiciono primero y
+el email falla, la licitación queda `activa` con su historial y el correo se reenvía. Si mando
+el email primero y la transición falla, mandé una propuesta "oficial" de algo que sigue en
+borrador. Además una llamada de red de 2 s dentro de una transacción mantiene el lock de la fila.
+
+**Timestamps contextuales.** `enviadaEn`, `resueltaEn` y `cerradaEn` son campos separados de
+`creadoEn`. Para auditar "se envió antes del plazo" hay que saber *cuándo se envió*.
+
+**Bucket privado + URL firmada.** Un bucket público genera links que no se pueden revocar. Con
+bucket privado se guarda el `path` y el link se firma en el momento de necesitarlo.
+
+**`cambiarEstado()` es el único que escribe `estado`.** El historial se escribe en la misma
+transacción que el update: o quedan los dos o no queda ninguno. Las automáticas van con
+`usuarioId: null` y `origen: automatica | sistema`, que es lo que hace verificable el requisito 2.
+
+**`precioUnitario` congelado en el ítem.** Si mañana se reprecia el catálogo, una licitación de
+hace 6 meses debe seguir mostrando el precio con el que se presupuestó.
+
+**`montoFacturado` aparte de `totalProductos`.** Se puede presupuestar $1.000.000 y facturar
+$950.000 con un descuento negociado. Si fueran siempre iguales, no se podría modelar una
+negociación y el requisito 6 no tendría sentido.
+
+---
+
+## 9. Pruebas
+
+```bash
+npm test          # 46 tests unitarios de la lógica pura (sin base de datos)
+npm run typecheck # TypeScript estricto
+npm run test:smoke  # 54 verificaciones end-to-end contra el server corriendo
+```
+
+`test:smoke` recorre el flujo completo y verifica los caminos de error, que es lo que más se
+evalúa: presupuesto excedido, transición inválida, envío sin documento, pago mayor al saldo,
+rol insuficiente, cron sin secreto.
+
+Para la demo con correos reales:
+
+```bash
+npx tsx --env-file=.env scripts/demo-email.ts
+```
+
+Crea tres licitaciones (una que vence ya, otra en 30 h, otra en 5 días), envía las tres
+propuestas con PDF adjunto, corre el job y muestra el resultado.
+
+---
+
+## 10. Job programado
+
+```bash
+# Con el server local corriendo
+curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/licitaciones
+```
+
+Respuesta real de la demo:
+
+```json
+{"ejecutadoEn":"2026-10-11T19:35:32.426Z","vencidas":1,"recordatorios":1,"errores":[]}
+```
+
+Orden interno: **primero vence, después recuerda**. Si fuera al revés, una licitación vencida
+hace una hora entraría en la ventana de 48 h y su cliente recibiría un "¡tenés tiempo!" de algo
+que ya venció.
+
+En producción se dispara con Vercel Cron (`vercel.json`) o con GitHub Actions, que golpea el
+mismo endpoint. El plan Hobby de Vercel corre **una vez por día**, por eso el endpoint acepta
+también POST y las llamadas manuales.
+
+---
+
+## 11. Despliegue
+
+1. Subir el repo a GitHub (público).
+2. En [vercel.com/new](https://vercel.com/new) → Import Project → elegir el repo.
+3. Cargar **todas** las variables de `.env.example`.
+4. Deploy.
+
+Como `cacheComponents` está desactivado a propósito (el 100 % de las páginas requiere sesión y
+con `true` leer la cookie fuera de un `<Suspense>` es error de build), el build es el de
+Turbopack por defecto.
+
+---
+
+## 12. Evidencia
+
+| Qué | Dónde |
+|---|---|
+| Login con roles | `evidencia/01-login.png` |
+| Panel de próximas a vencer | `evidencia/02-panel-proximas-a-vencer.png` |
+| Historial con transición automática | `evidencia/03-detalle-historial-vencimiento.png` |
+| Correos reales con adjunto | IDs de Resend + captura de la bandeja |
+| Documento accesible por URL real | Enlace generado desde el detalle de la licitación |
+| Respuesta del job | `npm run test:smoke` o el `curl` de la sección 10 |
+
+![Detalle con historial](evidencia/03-detalle-historial-vencimiento.png)
+
+En la captura se ve la diferencia entre las dos formas de transición:
+
+- `borrador → activa` marcada **Manual**, con `admin@demo.com`
+- `activa → perdida` marcada **Sistema · vencimiento**, sin usuario
+
+---
+
+## 13. Cosas que quedaron afuera
+
+Decisiones conscientes, no olvidos:
+
+- **Sin Swagger.** El enunciado lo lista como "funcionalidad extra" y solo aplica si el API es
+  independiente del frontend. Acá es full-stack.
+- **Sin tests de integración contra la base.** Los unitarios cubren las reglas puras y el
+  script de humo cubre el end-to-end por HTTP. Una capa intermedia (Prisma real en base de
+  prueba) no estaba en el presupuesto de tiempo.
+- **Paginación solo en el listado de licitaciones.** Clientes y productos son tablas chicas.
+- **Sin refresco automático.** El panel se actualiza al navegar o con `router.refresh()` tras
+  una mutación. Con el job horario, refrescar alcanza.
+- **Borrado lógico no implementado.** Los clientes se borran de verdad.
+
+## 14. Aviso de seguridad
+
+La contraseña de la base de desarrollo se rotó después de haber quedado expuesta en un canal
+de comunicación durante el desarrollo. `.env` está en `.gitignore`; `.env.example` sí va
+commiteado y no contiene valores reales.
