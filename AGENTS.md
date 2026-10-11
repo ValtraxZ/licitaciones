@@ -92,12 +92,16 @@ src/proxy.ts              protección de rutas
 
 ## Estado actual
 
+Proyecto: Supabase `bdexhlcebqhrgwhgppdn`, región declarada **us-west-2**, PostgreSQL 14.18,
+activo (la secret key responde 200 en `/rest/v1/`).
+
 - [x] Proyecto Next.js 16.4.0 creado, dependencias instaladas
 - [x] `next.config.ts` con `cacheComponents: false` documentado
 - [x] `prisma/schema.prisma` completo (6 entidades, auditoría, índices)
 - [x] `prisma.config.ts` + `.env` + `.env.example` + `.gitignore` corregido
 - [x] `src/lib/db.ts` singleton, `prisma/seed.ts`
-- [ ] **Bloqueado: conexión a la base.** Falta definir la región del pooler de Supabase
+- [x] Claves de Supabase cargadas (`sb_publishable_` / `sb_secret_`) y verificadas
+- [ ] **BLOQUEADO: `DATABASE_URL` / `DIRECT_URL`.** Ver abajo.
 - [ ] `src/lib/estados.ts`, `transiciones.ts`, `reglas.ts`
 - [ ] Auth (`session.ts`, `proxy.ts`, login)
 - [ ] CRUD clientes/productos/usuarios
@@ -105,6 +109,21 @@ src/proxy.ts              protección de rutas
 - [ ] Storage + envío con email
 - [ ] Pagos + cron
 - [ ] UI + deploy + README
+
+### Diagnóstico de la base de datos (resuelto, documentado en `.env`)
+
+- La conexión **directa** `db.<ref>.supabase.co` resuelve **solo a IPv6** (AAAA) y esta máquina
+  **no tiene ruta IPv6 a Internet** (`Get-NetRoute -AddressFamily IPv6 ::/0` vacío) → `P1001`
+  siempre. Inusable en local. Imposible arreglar desde el código.
+- El **pooler** `aws-0-<region>.pooler.supabase.com` resuelve a IPv4 y el puerto 5432 responde,
+  pero este proyecto usa el pooler **nuevo**: con `postgres.<ref>` responde
+  `tenant/user not found` y con `postgres` responde
+  `no tenant identifier provided (external_id or sni_hostname required)`.
+  Se barrieron las 19 regiones de Supabase con reintentos y ninguna acepta esos dos formatos.
+- **Acción pendiente del usuario:** copiar la cadena de la pestaña **"Session pooler"** del
+  dashboard (Supabase → Project Settings → Database → Connection string), con la contraseña puesta.
+- Barato de reintentar si vuelve a fallar: `npx prisma db push` con la variable ya cargada.
+
 
 ## Notas de seguridad
 

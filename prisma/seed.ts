@@ -60,11 +60,13 @@ async function main() {
   ];
 
   for (const c of clientes) {
-    await prisma.cliente.upsert({
-      where: { email: c.email! },
-      update: {},
-      create: c,
-    });
+    // `email` NO es unique en Cliente (una empresa puede tener varios contactos), así que
+    // no se puede usar `upsert` con esa clave. Se busca primero y se crea si no existe.
+    // Esto mantiene el seed idempotente, que es lo importante.
+    const existente = await prisma.cliente.findFirst({ where: { email: c.email! } });
+    if (!existente) {
+      await prisma.cliente.create({ data: c });
+    }
   }
 
   // ── Productos ──────────────────────────────────────────────────────────────
