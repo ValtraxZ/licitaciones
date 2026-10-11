@@ -69,6 +69,7 @@ model Usuario {
   licitacionesActualizadas Licitacion[] @relation("LicitacionActualizadoPor")
   pagosRegistrados      Pago[]          @relation("PagoRegistradoPor")
   historial             HistorialTransicion[] @relation("HistorialUsuario")
+  @@map("usuarios")
 }
 
 model Cliente {
@@ -90,6 +91,7 @@ model Cliente {
   licitaciones Licitacion[]
 
   @@index([email])
+  @@map("clientes")
 }
 
 // ─────────────────────────────── PRODUCTO ───────────────────────────────
@@ -111,6 +113,7 @@ model Producto {
   actualizadoPor Usuario? @relation("ProductoActualizadoPor", fields: [actualizadoPorId], references: [id], onDelete: SetNull)
 
   licitaciones LicitacionProducto[]
+  @@map("productos")
 }
 
 // ─────────────────────────────── LICITACIÓN ───────────────────────────────
@@ -169,6 +172,7 @@ model Licitacion {
   // Índice compuesto: es exactamente el WHERE del job programado (Regla 2).
   @@index([estado, fechaLimite])
   @@index([clienteId])
+  @@map("licitaciones")
 }
 
 // ─────────────────────── LICITACIÓN ↔ PRODUCTO (N:M) ───────────────────────
@@ -193,6 +197,7 @@ model LicitacionProducto {
   // Un producto no se agrega dos veces en la misma licitación: el alta repetida actualiza el ítem.
   @@unique([licitacionId, productoId])
   @@index([licitacionId])
+  @@map("licitacion_producto")
 }
 
 // ─────────────────────────────── PAGOS ───────────────────────────────
@@ -214,6 +219,7 @@ model Pago {
   registradoPor Usuario?  @relation("PagoRegistradoPor", fields: [registradoPorId], references: [id], onDelete: SetNull)
 
   @@index([licitacionId])
+  @@map("pagos")
 }
 
 // ─────────────────── HISTORIAL DE TRANSICIONES ───────────────────
@@ -241,4 +247,5 @@ model HistorialTransicion {
   usuario    Usuario?   @relation("HistorialUsuario", fields: [usuarioId], references: [id], onDelete: SetNull)
 
   @@index([licitacionId, createdAt])
+  @@map("historial_transicion")
 }

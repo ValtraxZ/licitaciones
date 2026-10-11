@@ -27,7 +27,7 @@ export type LicitacionReglas = {
   presupuestoMaximo: number;
   totalProductos: number;
   montoFacturado: number;
-  documentoUrl: string | null;
+  documentoPath: string | null;
   fechaLimite: Date;
 };
 
@@ -116,13 +116,20 @@ export function assertEditable(estado: EstadoLicitacion): void {
 
 // ─────────────────────────── REGLA 3: documento ───────────────────────────
 
-/** Una licitación solo se envía (borrador → activa) si tiene propuesta adjunta. */
-export function assertTieneDocumento(lic: { documentoUrl: string | null }): void {
-  if (!lic.documentoUrl) {
+/**
+ * Una licitación solo se envía (borrador → activa) si tiene propuesta adjunta.
+ *
+ * Se valida `documentoPath`, NO `documentoUrl`: el bucket de Storage es privado, así que
+ * en la base se guarda la CLAVE del objeto y la URL firmada se genera en el momento de
+ * necesitarla. Guardar el link sería guardar una credencial que expira, y la regla
+ * terminaría validando una URL muerta.
+ */
+export function assertTieneDocumento(lic: { documentoPath: string | null }): void {
+  if (!lic.documentoPath) {
     throw errores.regla(
       "DOCUMENTO_FALTANTE",
       "No se puede enviar la licitación: falta subir el documento de propuesta",
-      { documentoUrl: null },
+      { documentoPath: null },
     );
   }
 }

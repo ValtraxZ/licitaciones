@@ -8,6 +8,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:smoke": "tsx --env-file=.env scripts/smoke-test.ts",
+    "storage:setup": "tsx --env-file=.env prisma/setup-storage.ts",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",

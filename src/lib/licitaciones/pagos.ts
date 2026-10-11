@@ -1,4 +1,4 @@
-﻿/**
+/**
  * PAGOS Y COBRANZA (requisito 6)
  * ==============================
  * Reglas:
@@ -37,10 +37,11 @@ export async function registrarPago(licitacionId: string, datos: DatosPago, acto
     // El segundo pago espera, y cuando lee ya ve el saldo descontado del primero.
     // Es la solución estándar para "leer, validar y escribir" sobre el mismo saldo.
     //
-    // Prisma no expone esto en su API de alto nivel (findUnique no bloquea), por eso
-    // se usa `$queryRaw`. Es SQL parametrizado: Prisma escapa los valores, no hay
-    // riesgo de inyección.
-    await tx.$queryRaw`SELECT id FROM licitacion WHERE id = ${licitacionId} FOR UPDATE`;
+    // Prisma no expone el lock de fila en su API de alto nivel (`findUnique` no bloquea),
+    // así que se usa `$queryRaw`. El SQL va PARAMETRIZADO: Prisma escapa el valor del id,
+    // no hay riesgo de inyección. El nombre de la tabla es el mapeado en el schema
+    // (`@@map("licitaciones")`), no el nombre del modelo.
+    await tx.$queryRaw`SELECT id FROM licitaciones WHERE id = ${licitacionId} FOR UPDATE`;
 
     const licitacion = await tx.licitacion.findUnique({
       where: { id: licitacionId },

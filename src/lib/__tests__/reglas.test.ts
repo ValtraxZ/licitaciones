@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { ErrorNegocio } from "../errores";
 import {
   assertDentroDePresupuesto,
@@ -120,11 +120,11 @@ describe("editabilidad de la licitación", () => {
 
 describe("Regla 3 — no enviar sin documento de propuesta", () => {
   it("permite enviar con documento adjunto", () => {
-    expect(() => assertTieneDocumento({ documentoUrl: "https://x.supabase.co/p.pdf" })).not.toThrow();
+    expect(() => assertTieneDocumento({ documentoPath: "https://x.supabase.co/p.pdf" })).not.toThrow();
   });
 
   it("rechaza con 422 si no hay documento", () => {
-    const err = capturarError(() => assertTieneDocumento({ documentoUrl: null }));
+    const err = capturarError(() => assertTieneDocumento({ documentoPath: null }));
     expect(err.status).toBe(422);
     expect(err.code).toBe("DOCUMENTO_FALTANTE");
   });
@@ -168,7 +168,7 @@ describe("Regla 3 aplicada al envío (borrador → activa)", () => {
     presupuestoMaximo: 1_000_000,
     totalProductos: 500_000,
     montoFacturado: 0,
-    documentoUrl: "https://x.supabase.co/p.pdf",
+    documentoPath: "https://x.supabase.co/p.pdf",
     fechaLimite: new Date("2026-07-01T12:00:00Z"),
   };
   const ahora = new Date("2026-06-01T12:00:00Z");
@@ -178,7 +178,7 @@ describe("Regla 3 aplicada al envío (borrador → activa)", () => {
   });
 
   it("bloquea el envío sin documento", () => {
-    expect(capturarError(() => assertPuedeEnviar({ ...base, documentoUrl: null }, ahora)).code).toBe("DOCUMENTO_FALTANTE");
+    expect(capturarError(() => assertPuedeEnviar({ ...base, documentoPath: null }, ahora)).code).toBe("DOCUMENTO_FALTANTE");
   });
 
   it("bloquea el envío con la fecha límite ya vencida", () => {
