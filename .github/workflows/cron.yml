@@ -1,0 +1,40 @@
+name: Job programado de licitaciones
+
+# El plan Hobby de Vercel corre los cron UNA vez por día. Este workflow golpea el
+# MISMO endpoint cada 30 minutos, así que el vencimiento automático y el recordatorio
+# de 48 h funcionan con una frecuencia útil sin pagar.
+#
+# El endpoint es el que también usa Vercel Cron: la lógica está en la app, no en el
+# scheduler. Cambiar de transporte no requiere tocar código.
+on:
+  schedule:
+    # Cada 30 minutos. GitHub no garantiza el minuto exacto: puede demorar unos minutos.
+    - cron: "*/30 * * * *"
+  # Permite dispararlo a mano desde la UI para generar evidencia sin esperar al horario.
+  workflow_dispatch:
+
+concurrency:
+  # Si se pisan dos ejecuciones (GitHub las encola, no las cancela), la segunda espera.
+  group: cron-licitaciones
+  cancel-in-progress: false
+
+jobs:
+  ejecutar:
+    runs-on: ubuntu-latest
+    # El job dura unos segundos: no hace falta guardar nada.
+    timeout-minutes: 5
+    steps:
+      - name: Llamar al endpoint del cron
+        run: |
+          curl --fail --silent --show-error \
+            -o respuesta.json -w "HTTP %{http_code}\n" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ vars.APP_URL }}/api/cron/licitaciones"
+            echo ""
+      - name: Subir la respuesta como evidencia
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: respuesta-cron
+          path: respuesta.json
+          retention-days: 30
