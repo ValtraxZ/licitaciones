@@ -57,8 +57,12 @@ model Usuario {
   actualizadoEn  DateTime @updatedAt
 
   // Relaciones de auditoría hacia sí mismo
-  creadoPor     Usuario?  @relation("UsuarioCreadoPor", fields: [creadoPorId], references: [id], onDelete: SetNull)
+  creadoPor        Usuario?  @relation("UsuarioCreadoPor", fields: [creadoPorId], references: [id], onDelete: SetNull)
   creadoPorUsuarios Usuario[] @relation("UsuarioCreadoPor")
+  // Sin esta relación, `actualizadoPorId` era un escalar colgado: nadie lo llenaba y no se
+  // podía consultar. Un campo de auditoría que no se puede leer no sirve de nada.
+  actualizadoPor         Usuario?  @relation("UsuarioActualizadoPor", fields: [actualizadoPorId], references: [id], onDelete: SetNull)
+  actualizadoPorUsuarios Usuario[] @relation("UsuarioActualizadoPor")
 
   // Relaciones de auditoría desde otras entidades
   clientesCreados       Cliente[]       @relation("ClienteCreadoPor")
@@ -67,7 +71,10 @@ model Usuario {
   productosActualizados Producto[]      @relation("ProductoActualizadoPor")
   licitacionesCreadas   Licitacion[]    @relation("LicitacionCreadoPor")
   licitacionesActualizadas Licitacion[] @relation("LicitacionActualizadoPor")
+  itemsLicitacion      LicitacionProducto[] @relation("ItemCreadoPor")
+  itemsLicitacionActualizados LicitacionProducto[] @relation("ItemActualizadoPor")
   pagosRegistrados      Pago[]          @relation("PagoRegistradoPor")
+  pagosActualizados     Pago[]          @relation("PagoActualizadoPor")
   historial             HistorialTransicion[] @relation("HistorialUsuario")
   @@map("usuarios")
 }
@@ -188,8 +195,15 @@ model LicitacionProducto {
   precioUnitario Int
   subtotal      Int // cantidad * precioUnitario (centavos)
 
-  creadoEn     DateTime @default(now())
-  actualizadoEn DateTime @updatedAt
+  // Auditoría: el requisito dice "quién creó/modificó y cuándo" en CADA entidad.
+  // Un ítem sin saber qué usuario lo agregó deja el presupuesto sin trazabilidad.
+  creadoPorId      String?
+  creadoEn         DateTime @default(now())
+  actualizadoPorId String?
+  actualizadoEn    DateTime @updatedAt
+
+  creadoPor      Usuario? @relation("ItemCreadoPor", fields: [creadoPorId], references: [id], onDelete: SetNull)
+  actualizadoPor Usuario? @relation("ItemActualizadoPor", fields: [actualizadoPorId], references: [id], onDelete: SetNull)
 
   licitacion Licitacion @relation(fields: [licitacionId], references: [id], onDelete: Cascade)
   producto   Producto   @relation(fields: [productoId], references: [id], onDelete: Restrict)
@@ -212,11 +226,17 @@ model Pago {
   notas      String?
 
   fechaPago     DateTime @default(now())
-  registradoPorId String?
-  creadoEn       DateTime @default(now())
+  // Un pago se registra una vez y no se modifica nunca, pero el esquema mantiene la
+  // auditoría completa para no romper la regla de "cada entidad" ni si mañana se agrega
+  // una anulación o corrección.
+  registradoPorId   String?
+  actualizadoPorId  String?
+  creadoEn          DateTime @default(now())
+  actualizadoEn     DateTime @updatedAt
 
-  licitacion   Licitacion @relation(fields: [licitacionId], references: [id], onDelete: Cascade)
-  registradoPor Usuario?  @relation("PagoRegistradoPor", fields: [registradoPorId], references: [id], onDelete: SetNull)
+  licitacion    Licitacion @relation(fields: [licitacionId], references: [id], onDelete: Cascade)
+  registradoPor Usuario?   @relation("PagoRegistradoPor", fields: [registradoPorId], references: [id], onDelete: SetNull)
+  actualizadoPor Usuario?  @relation("PagoActualizadoPor", fields: [actualizadoPorId], references: [id], onDelete: SetNull)
 
   @@index([licitacionId])
   @@map("pagos")
