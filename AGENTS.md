@@ -39,6 +39,11 @@ negocio, código, documentación, deploy, e integración real de email con adjun
 - Next 16: `cookies()` y `params` son **async** (el acceso síncrono fue eliminado).
 - Next 16: `export const dynamic = 'force-dynamic'` sigue funcionando solo si
   `cacheComponents: false`. Está en false a propósito (ver `next.config.ts`).
+- **Vercel + pooler ⇒ `connection_limit=1`.** Vercel corre varias instancias de serverless
+  a la vez. Con `connection_limit=5` cada una abre 5 conexiones y se agota el pool de
+  Supabase: no avisa, solo corta, y el síntoma es que **todo endpoint que toca la base
+  devuelve 500** mientras los que no la tocan responden 200. Se confunde con un bug de
+  sesión o de deploy. `src/lib/db.ts` lo agrega si la URL no lo trae. NO volver a 5.
 
 ## Reglas innegociables del dominio
 
@@ -105,8 +110,8 @@ PostgreSQL 17.11. **CONEXIÓN RESUELTA** ✅
 - [x] `src/lib/db.ts` singleton, `prisma/seed.ts` (idempotente)
 - [x] Claves de Supabase y pooler cargadas
 - [x] **`prisma db push` aplicado + seed corrido** (2 clientes, 4 productos, 2 usuarios)
-- [x] **Núcleo de reglas de negocio**: `estados.ts`, `reglas.ts`, `transiciones.ts`,
-      `licitaciones/productos.ts`, `licitaciones/pagos.ts` — **46 tests pasando**
+- [x] Núcleo de reglas de negocio: `estados.ts`, `reglas.ts`, `transiciones.ts`,
+      `licitaciones/productos.ts`, `licitaciones/pagos.ts` — **52 tests pasando**
 - [x] **Auth completa**: `token.ts`, `session.ts`, `passwords.ts`, `proxy.ts`,
       `api/auth/{login,logout,me}` — verificada end-to-end
 - [x] CRUD clientes / productos / usuarios (solo admin crea usuarios)

@@ -346,7 +346,7 @@ npm run dev
 |---|---|
 | `npm run dev` | Servidor de desarrollo |
 | `npm run build` / `npm start` | Build y servidor de producción (mucho más rápido) |
-| `npm test` | 46 tests unitarios de la lógica pura, sin base de datos |
+| `npm test` | 52 tests unitarios de la lógica pura, sin base de datos |
 | `npm run typecheck` | TypeScript estricto |
 | `npm run test:smoke` | 54 verificaciones end-to-end (con el server corriendo) |
 | `npm run storage:setup` | Crea y verifica el bucket de Storage |

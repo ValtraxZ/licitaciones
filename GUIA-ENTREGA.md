@@ -204,7 +204,7 @@ Y el PDF quedó descargado en `evidencia/propuesta-descargada.pdf`.
 
 ```bash
 npm run typecheck      # TypeScript
-npm test               # 46 tests unitarios
+npm test               # 52 tests unitarios
 npm run build          # build de producción
 npm run dev            # en otra terminal
 npm run test:smoke     # 54 verificaciones end-to-end

@@ -57,7 +57,7 @@ Tabla de trazabilidad. Cada fila se puede comprobar con un comando concreto.
 **Verificacion reproducible:**
 
 ```bash
-npm test                  # 46 tests de la logica pura
+npm test                  # 52 tests de la logica pura
 npm run test:smoke        # 54 verificaciones del flujo completo por HTTP
 npm run test:paginas      # 15 verificaciones de pantallas, permisos y documentación
 npm run test:produccion   # 18 verificaciones contra el deploy real
@@ -145,6 +145,34 @@ correctos. Hay que copiar la cadena desde **Project Settings → Database → Co
 
 Además, la conexión directa `db.<ref>.supabase.co` resuelve **solo a IPv6**. En una red sin
 salida IPv6 falla siempre con `P1001`, por eso ambas variables apuntan al pooler.
+
+### ⚠️ `connection_limit=1`: el bug que no parece un bug
+
+Con `connection_limit=5` en la URL, el proyecto funcionaba en local y se caía solo en
+producción. Los síntomas parecían de autenticación:
+
+- `/dashboard` redirigía al login aunque la cookie fuese válida.
+- `POST /api/auth/login` devolvía **500**.
+- `/api/openapi` y `/api/auth/me` respondían bien.
+
+La causa no era la sesión: era que **todas las requests que tocan la base fallaban**, y las
+que no la tocan, no. En Vercel conviven varias instancias de serverless, cada una abriendo
+hasta 5 conexiones al pooler de Supabase. Cuando se pasa el tope del pooler, no avisa:
+simplemente deja de aceptar conexiones, y la app entera devuelve 500. Después de unos
+minutos sin tráfico, las conexiones se liberan y todo vuelve a funcionar solo, lo que hace
+el diagnóstico todavía más confuso.
+
+Se arregla en `src/lib/db.ts`: si la URL no trae `connection_limit`, se le agrega `=1`.
+Cada instancia abre a lo sumo una conexión, que es lo que corresponde cuando hay un pooler
+adelante — las requests de una instancia ya se serializan solas.
+
+Se hace con concat de strings y no con `new URL()` a propósito: el parser normaliza y
+re-escapa usuario y contraseña, y un escapado distinto rompe la autenticación contra el
+pooler. Agregar un parámetro de query es un cambio de texto plano que no puede tocar las
+credenciales. Hay un test (`src/lib/__tests__/db.test.ts`) que lo verifica.
+
+> ParaEvaluator: si clonás el repo, `connection_limit=1` ya viene en `.env.example` y
+> `src/lib/db.ts` lo aplica igual si tu URL no lo trae. No hace falta tocar nada.
 
 ---
 
@@ -254,7 +282,7 @@ negociación y el requisito 6 no tendría sentido.
 ## 9. Pruebas
 
 ```bash
-npm test          # 46 tests unitarios de la lógica pura (sin base de datos)
+npm test          # 52 tests unitarios de la lógica pura (sin base de datos)
 npm run typecheck # TypeScript estricto
 npm run test:smoke  # 54 verificaciones end-to-end contra el server corriendo
 ```

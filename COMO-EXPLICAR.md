@@ -143,7 +143,7 @@ Buena respuesta:
 
 > Escribí tres tipos de pruebas:
 >
-> **46 tests unitarios** sobre las reglas de negocio, sin base de datos. Incluyen las 36
+> **52 tests unitarios** sobre las reglas de negocio, sin base de datos. Incluyen las 36
 > combinaciones posibles de estados, comparadas contra la tabla del enunciado escrita a
 > mano como especificación.
 >
