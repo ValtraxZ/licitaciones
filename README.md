@@ -266,6 +266,27 @@ también POST y las llamadas manuales.
 
 ---
 
+## Demo en produccion
+
+**<https://licitaciones-mu-sepia.vercel.app>**
+
+| Rol | Usuario | Contrasena |
+|---|---|---|
+| Administrador | `admin@demo.com` | `Admin123!` |
+| Usuario | `user@demo.com` | `User123!` |
+
+Verificacion automatica contra el entorno desplegado:
+
+```bash
+SMOKE_BASE_URL=https://licitaciones-mu-sepia.vercel.app npx tsx --env-file=.env scripts/ver-produccion.ts
+```
+
+Comprueba 18 cosas: que el sitio sea publico, que la API responda contra la base real,
+que los roles se respeten, que las reglas de negocio devuelvan los errores correctos
+y que las seis pantallas rendericen.
+
+---
+
 ## 11. Despliegue
 
 1. Subir el repo a GitHub (público).
