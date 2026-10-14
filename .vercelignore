@@ -1,0 +1,23 @@
+# Archivos que NO se suben a Vercel al desplegar con la CLI.
+#
+# Vercel respeta .gitignore, pero lo dejo explícito porque el .env contiene la
+# contraseña de la base y las claves de Resend y Supabase: si por algún motivo se subieran, quedarían en el historial del despliegue.
+.env
+.env.local
+.env*.local
+node_modules
+.next
+out
+dev.log
+server.log
+*.log
+prisma/benchmark-conexion.ts
+prisma/sonda.ts
+prueba-lat.mjs
+lat.mjs
+dbg.mjs
+diag.mjs
+out.txt
+err.txt
+o.txt
+tsconfig.tsbuildinfo
