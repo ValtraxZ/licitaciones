@@ -334,37 +334,65 @@ export function SubirDocumento({ licitacionId }: { licitacionId: string }) {
 
   const { ejecutar, cargando, error } = useAccion(subir);
 
+  const generar = async () => {
+    await api(`/api/licitaciones/${licitacionId}/documento/generar`, { metodo: "POST" });
+  };
+  const accionGenerar = useAccion(generar);
+  const errorGenerar = accionGenerar.error ?? error;
+
   return (
-    <form
-      className="mt-4 space-y-2"
-      onSubmit={(e) => {
-        e.preventDefault();
-        void ejecutar(new FormData(e.currentTarget));
-      }}
-    >
-      <label className="block text-xs font-medium text-slate-600">
-        Subir propuesta (PDF, hasta 10 MB)
-      </label>
-      <input
-        type="file"
-        name="archivo"
-        accept=".pdf,.doc,.docx"
-        required
-        className="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white"
-      />
-      {error && (
+    <div className="mt-4 space-y-4">
+      {/*
+        Generar el PDF desde los productos cargados es el camino recomendado: el documento
+        se arma con los MISMOS datos que muestra el detalle, así que no puede desincronizarse.
+        Subir un PDF a mano queda para cuando el documento ya viene firmado de otra forma.
+      */}
+      <div className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200">
+        <button
+          type="button"
+          onClick={() => void accionGenerar.ejecutar()}
+          disabled={accionGenerar.cargando}
+          className="w-full rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        >
+          {accionGenerar.cargando ? "Generando…" : "Generar propuesta en PDF"}
+        </button>
+        <p className="mt-1.5 text-xs text-slate-500">
+          Crea el documento con los productos cotizados, el total y el plazo, y lo adjunta.
+        </p>
+      </div>
+
+      <div>
+        <p className="mb-1 text-xs font-medium text-slate-600">O subir un archivo propio</p>
+        <form
+          className="space-y-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void ejecutar(new FormData(e.currentTarget));
+          }}
+        >
+          <input
+            type="file"
+            name="archivo"
+            accept=".pdf,.doc,.docx"
+            required
+            className="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white"
+          />
+          <button
+            type="submit"
+            disabled={cargando}
+            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+          >
+            {cargando ? "Subiendo…" : "Subir documento"}
+          </button>
+        </form>
+      </div>
+
+      {errorGenerar && (
         <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">
-          {error}
+          {errorGenerar}
         </p>
       )}
-      <button
-        type="submit"
-        disabled={cargando}
-        className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-      >
-        {cargando ? "Subiendo…" : "Subir documento"}
-      </button>
-    </form>
+    </div>
   );
 }
 

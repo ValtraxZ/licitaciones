@@ -50,21 +50,6 @@ async function pedir(metodo: string, ruta: string, cuerpo?: unknown) {
 
 const horas = (n: number) => new Date(Date.now() + n * 3_600_000).toISOString();
 
-function pdfReal(): string {
-  return `%PDF-1.4
-1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj
-2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj
-3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj
-4 0 obj<</Length 200>>stream
-BT /F1 18 Tf 60 760 Td (PROPUESTA COMERCIAL) Tj 0 -28 Td (Sistema de Gestion de Licitaciones) Tj 0 -18 Td (Documento de prueba generado para la demo.) Tj ET
-endstream
-endobj
-5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj
-trailer<</Root 1 0 R>>
-%%EOF
-`;
-}
-
 /** Crea la licitación completa (productos + PDF) y la envía, como haría un usuario. */
 async function crearYEnviar(titulo: string, limite: string, productoId: string, cantidad: number) {
   const clientes = await pedir("GET", "/api/clientes");
@@ -88,13 +73,12 @@ async function crearYEnviar(titulo: string, limite: string, productoId: string, 
     productoId, cantidad, precioUnitario: 850_000,
   });
 
-  const form = new FormData();
-  form.append(
-    "archivo",
-    new File([pdfReal()], `propuesta-${id.slice(0, 8)}.pdf`, { type: "application/pdf" }),
-  );
-  const subida = await pedir("POST", `/api/licitaciones/${id}/documento`, form);
-  if (!subida.ok) throw new Error(`No se pudo subir el PDF: ${JSON.stringify(subida.datos)}`);
+  // El PDF lo genera la propia app a partir de los productos cargados: asi el documento
+  // y el detalle nunca muestran montos distintos.
+  const generado = await pedir("POST", `/api/licitaciones/${id}/documento/generar`);
+  if (!generado.ok) {
+    throw new Error(`No se pudo generar el PDF: ${JSON.stringify(generado.datos)}`);
+  }
 
   const envio = await pedir("POST", `/api/licitaciones/${id}/enviar`);
   if (!envio.ok) throw new Error(`No se pudo enviar: ${JSON.stringify(envio.datos)}`);
