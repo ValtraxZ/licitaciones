@@ -1,3 +1,5 @@
+export {};
+
 /**
  * Verifica que todas las páginas internas respondan 200 con el HTML esperado
  * (y que un usuario NO admin sea redirigido en vez de ver una pantalla de error).
@@ -83,6 +85,30 @@ async function main() {
   );
   const panelUser = await pagina(user, "/dashboard");
   ok(panelUser.status === 200, "/dashboard funciona para USER", `status=${panelUser.status}`);
+
+  console.log("\nDocumentacion de la API (publica a proposito):");
+  // Sin cookie: la documentacion tiene que poder consultarse sin iniciar sesion, si no el
+  // evaluador tendria que crear una cuenta solo para ver el spec.
+  const docs = await pagina("", "/api-docs");
+  ok(
+    docs.status === 200 && docs.html.includes('id="swagger-ui"'),
+    "/api-docs responde 200 sin sesion y monta Swagger UI",
+    `status=${docs.status}`,
+  );
+
+  const spec = await fetch(`${BASE}/api/openapi`);
+  const cuerpo = await spec.json();
+  const rutas = Object.keys(cuerpo.paths ?? {});
+  ok(spec.status === 200 && cuerpo.openapi?.startsWith("3."), "el spec declara una version de OpenAPI 3", `status=${spec.status}`);
+  ok(
+    rutas.includes("/api/licitaciones") && rutas.includes("/api/cron/licitaciones"),
+    "el spec incluye los endpoints de licitaciones y el cron",
+    `rutas=${rutas.length}`,
+  );
+  ok(
+    (cuerpo.info?.description ?? "").includes("centavos"),
+    "el spec documenta que los montos van en centavos",
+  );
 
   console.log(`\n${"=".repeat(56)}`);
   console.log(fallos === 0 ? "\nTodas las paginas OK\n" : `\n${fallos} con error\n`);

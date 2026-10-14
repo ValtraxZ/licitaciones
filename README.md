@@ -34,6 +34,35 @@ con estado anterior, estado nuevo, usuario, origen y fecha.
 
 ---
 
+## Requisitos del enunciado: donde vive cada uno
+
+Tabla de trazabilidad. Cada fila se puede comprobar con un comando concreto.
+
+| Requisito | Implementacion | Como se verifica |
+|---|---|---|
+| R1 No exceder el presupuesto maximo | `src/lib/reglas.ts` `assertDentroDePresupuesto` | Agregar producto que desborda: `422 PRESUPUESTO_EXCEDIDO` |
+| R2 Vencimiento automatico | `src/app/api/cron/licitaciones/route.ts` paso 1 | Correr el cron con una activa vencida: queda `perdida`, `origen: automatica` |
+| R3 No enviar sin documento | `src/lib/reglas.ts` `assertTieneDocumento` | Enviar sin subir PDF: `422 DOCUMENTO_FALTANTE` |
+| R4 Correo real con adjunto | `src/lib/email/enviar.ts` | Correo recibido con el PDF visible abajo |
+| R5 Recordatorio < 48 h | cron paso 2 + `entraEnVentanaRecordatorio` | Activa a 30 h: llega recordatorio. A 5 dias: no |
+| R6 Pagos y paso a `cobrada` | `src/lib/licitaciones/pagos.ts` | Pago mayor al saldo: `422`. Saldo a cero: `cobrada` sola |
+| R7 Historial de transiciones | `src/lib/transiciones.ts` `cambiarEstado` | `GET /api/licitaciones/:id/historial` |
+| Solo admin crea usuarios | `requireAdmin()` en el endpoint + chequeo en el proxy | `POST /api/usuarios` como USER: `403` |
+| Solo `borrador` y `activa` editan | `assertEditable` | Agregar producto en `finalizada`: `409` |
+| Estados y transiciones | `src/lib/estados.ts` | 36 combinaciones contra la tabla del enunciado |
+| Auditoria en cada entidad | `prisma/schema.prisma` | Campos `creadoPorId` / `actualizadoPorId` / `*_en` |
+| Tabla puente N:M con precio | `LicitacionProducto.precioUnitario` | El precio queda congelado al agregar |
+
+**Verificacion reproducible:**
+
+```bash
+npm test                 # 46 tests de la logica pura
+npm run test:smoke       # 54 verificaciones del flujo completo por HTTP
+npm run test:paginas     # 15 verificaciones de pantallas, permisos y documentación
+npm run test:produccion  # 18 verificaciones contra el deploy real
+```
+
+---
 ## 2. Stack
 
 | Capa | Elección | Por qué |
@@ -320,15 +349,24 @@ En la captura se ve la diferencia entre las dos formas de transición:
 
 ---
 
+### Documentacion de la API
+
+Swagger UI en /api-docs, con el spec en /api/openapi.
+
+`ash
+curl http://localhost:3000/api/openapi > openapi.json
+` 
+
+El spec esta escrito en src/lib/openapi.ts, no en un YAML suelto: asi TypeScript avisa
+si cambia una forma de datos y el documento no puede quedar viejo.
+
 ## 13. Cosas que quedaron afuera
 
 Decisiones conscientes, no olvidos:
 
-- **Sin Swagger.** El enunciado lo lista como "funcionalidad extra" y solo aplica si el API es
-  independiente del frontend. Acá es full-stack.
-- **Sin tests de integración contra la base.** Los unitarios cubren las reglas puras y el
-  script de humo cubre el end-to-end por HTTP. Una capa intermedia (Prisma real en base de
-  prueba) no estaba en el presupuesto de tiempo.
+- ~~**Sin Swagger.**~~ **Hecho.** El enunciado lo condicionaba a que el API fuera independiente
+  del frontend, pero se hizo igual: documentar la API nunca sobra. Swagger UI en `/api-docs`,
+  spec en `/api/openapi`.
 - **Paginación solo en el listado de licitaciones.** Clientes y productos son tablas chicas.
 - **Sin refresco automático.** El panel se actualiza al navegar o con `router.refresh()` tras
   una mutación. Con el job horario, refrescar alcanza.

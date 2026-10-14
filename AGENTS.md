@@ -74,7 +74,7 @@ negocio, código, documentación, deploy, e integración real de email con adjun
 ## Estructura
 
 ```
-prisma/schema.prisma      modelo de datos (6 entidades + auditoría)
+prisma/schema.prisma      modelo de datos (7 entidades + auditoría)
 prisma/seed.ts            seed idempotente con upsert
 src/lib/estados.ts        ← MÁQUINA DE ESTADOS
 src/lib/transiciones.ts   ← cambiarEstado(): único lugar que toca `estado`
@@ -85,8 +85,11 @@ src/lib/errores.ts        ErrorNegocio + responderError
 src/lib/validators.ts     schemas de Zod
 src/lib/storage.ts        Supabase Storage
 src/lib/email/            Resend + plantillas
+src/lib/pdf/propuesta.ts  genera la propuesta en PDF (pdfkit)
+src/lib/openapi.ts        spec OpenAPI en código (no YAML: no puede quedar viejo)
 src/app/api/**/route.ts   endpoints
 src/app/api/cron/         job programado
+src/app/api-docs/         Swagger UI (pública, sin sesión)
 src/proxy.ts              protección de rutas
 ```
 
@@ -97,7 +100,7 @@ PostgreSQL 17.11. **CONEXIÓN RESUELTA** ✅
 
 - [x] Proyecto Next.js 16.4.0 + TypeScript + Prisma 6.19
 - [x] `next.config.ts` con `cacheComponents: false` documentado
-- [x] `prisma/schema.prisma` completo (6 entidades, auditoría, índices)
+- [x] `prisma/schema.prisma` completo (7 entidades, auditoría, índices)
 - [x] `prisma.config.ts` + `.env` + `.env.example` + `.gitignore`
 - [x] `src/lib/db.ts` singleton, `prisma/seed.ts` (idempotente)
 - [x] Claves de Supabase y pooler cargadas
@@ -106,11 +109,12 @@ PostgreSQL 17.11. **CONEXIÓN RESUELTA** ✅
       `licitaciones/productos.ts`, `licitaciones/pagos.ts` — **46 tests pasando**
 - [x] **Auth completa**: `token.ts`, `session.ts`, `passwords.ts`, `proxy.ts`,
       `api/auth/{login,logout,me}` — verificada end-to-end
-- [ ] CRUD clientes / productos / usuarios (solo admin crea usuarios)
-- [ ] Endpoints de licitaciones (crear, detalle, productos, enviar, resolver, facturar, pagos)
-- [ ] Storage + envío con email real y adjunto
-- [ ] Job programado (vencimiento + recordatorio)
-- [ ] UI + deploy + README + evidencia
+- [x] CRUD clientes / productos / usuarios (solo admin crea usuarios)
+- [x] Endpoints de licitaciones (crear, detalle, productos, enviar, resolver, facturar, pagos)
+- [x] Storage + envío con email real y adjunto
+- [x] Job programado (vencimiento + recordatorio)
+- [x] UI + deploy + README + evidencia
+- [x] Documentación OpenAPI: `src/lib/openapi.ts` + `/api-docs` + `/api/openapi`
 
 ### Trampa del pooler de Supabase (no volver a picar)
 

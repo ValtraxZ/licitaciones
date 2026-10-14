@@ -1,3 +1,5 @@
+export {};
+
 /**
  * Verificación completa contra un entorno desplegado (producción).
  * Comprueba que la app responde, que la base está conectada, que los roles funcionan

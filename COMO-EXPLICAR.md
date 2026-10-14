@@ -150,7 +150,7 @@ Buena respuesta:
 > **54 pruebas de humo** que hacen el recorrido completo por HTTP: crear, exceder el
 > presupuesto, enviar sin documento, pagar de más, hasta que queda cobrada sola.
 >
-> **11 verificaciones de página** que comprueban que cada pantalla responde lo correcto y
+> **15 verificaciones de página** que comprueban que cada pantalla responde lo correcto y
 > que los permisos se respetan.
 >
 > Lo más útil: esas pruebas encontraron cuatro bugs reales que a simple vista no se veían,
@@ -169,6 +169,27 @@ Buena respuesta:
 | Un endpoint | `src/app/api/**/route.ts` |
 | Los colores de la interfaz | `src/app/globals.css` y `src/lib/ui.ts` |
 | La plantilla del email | `src/lib/email/plantillas.ts` |
+| La documentación de la API | `src/lib/openapi.ts` (spec) y `src/app/api-docs/` (Swagger UI) |
+
+---
+
+## Si te preguntan "¿la API está documentada?"
+
+Sí, y conviene decir **por qué está escrita en código y no en un `openapi.yaml`**.
+
+La respuesta: un YAML escrito a mano se desactualiza en silencio. Alguien cambia un endpoint
+y el documento sigue diciendo lo que decía hace tres meses; nadie se entera hasta que el
+evaluador prueba un endpoint y ve que la documentación miente. Con el spec en TypeScript,
+el compilador avisa apenas cambia una forma de datos.
+
+- Se ve en `/api-docs` (Swagger UI, cargada desde el CDN para no sumar 1 MB al bundle).
+- Se descarga en `/api/openapi` y se importa en Postman o Insomnia.
+- Cubre los 18 paths con los 6 estados del dominio como enum, los esquemas de autenticación
+  (cookie para la API, bearer para el cron) y los códigos de error de negocio.
+
+Un detalle fino que sale bien si preguntan: Swagger UI **no puede usar la cookie de sesión**,
+porque vive en el navegador y no puede leer una cookie httpOnly. Por eso la página dice que
+para probar de verdad conviene importar el spec en Postman, que sí maneja cookies.
 
 ---
 

@@ -58,7 +58,10 @@ cómo verificarlo, decisiones de diseño, y comandos de prueba.
 
 ---
 
-## Entregable 3 — Despliegue en servicio gratuito ⬜ falta hacerlo
+## Entregable 3 — Despliegue en servicio gratuito ✅ hecho
+
+> **Deploy funcionando:** https://licitaciones-mu-sepia.vercel.app
+> **Job programado:** verificado contra producción (ver `EVIDENCIAS.md`, sección 3).
 
 ### Antes de empezar: rotar la contraseña de la base
 
@@ -205,8 +208,12 @@ npm test               # 46 tests unitarios
 npm run build          # build de producción
 npm run dev            # en otra terminal
 npm run test:smoke     # 54 verificaciones end-to-end
-npm run test:paginas   # 11 verificaciones de páginas
+npm run test:paginas   # 15 verificaciones de páginas
+npm run test:produccion  # 18 verificaciones contra el deploy real
 ```
+
+Y la documentación de la API, que también se puede abrir a mano:
+<https://licitaciones-mu-sepia.vercel.app/api-docs>
 
 Si los tres de tests dan verde, podés decir en la entrevista que el flujo completo
 está verificado automáticamente.

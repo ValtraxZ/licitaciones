@@ -44,3 +44,7 @@ next-env.d.ts
 
 # logs locales de desarrollo
 dev.log
+
+# logs de ejecucion: nunca van al repo
+*.log
+!npm-debug.log*
