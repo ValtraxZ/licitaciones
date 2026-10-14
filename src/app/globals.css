@@ -1,26 +1,77 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/**
+ * PALETA DE LA APLICACIÓN
+ * =======================
+ * Tres familias, todas en tonos Professional (saturación baja, sin neón):
+ *
+ *   azul     → identidad institucional, navegación y acciones primarias
+ *   naranja  → acento para las acciones que cambian el estado de una licitación
+ *   tierra   → marrones cálidos: fondos, bordes y texto secundario
+ *
+ * Los colores se declaran como tokens de Tailwind v4 (`@theme`) para poder usarlos
+ * como clases normales: `bg-azul-700`, `text-tierra-500`, `border-naranja-300`.
+ *
+ * ACABADO MATE: rellenos sólidos, sin degradados ni resplandores. El foco se marca con
+ * un anillo de foco y un cambio de tono al pasar el cursor, no con sombras brillantes.
+ */
+@theme {
+  /* ── Azul institucional ── */
+  --color-azul-50: #eff4fa;
+  --color-azul-100: #dce7f4;
+  --color-azul-200: #b9cde6;
+  --color-azul-300: #8aabd2;
+  --color-azul-400: #5c88bb;
+  --color-azul-500: #3e6ca4;
+  --color-azul-600: #30588a;
+  --color-azul-700: #27486f;
+  --color-azul-800: #213a59;
+  --color-azul-900: #1b2d45;
+  --color-azul-950: #121d2e;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  /* ── Naranja de acento ── */
+  --color-naranja-50: #fdf6f0;
+  --color-naranja-100: #f9e8db;
+  --color-naranja-200: #f2ccb1;
+  --color-naranja-300: #e8a87e;
+  --color-naranja-400: #dc8352;
+  --color-naranja-500: #cc6633;
+  --color-naranja-600: #b44f24;
+  --color-naranja-700: #923e1e;
+  --color-naranja-800: #75341e;
+  --color-naranja-900: #5f2d1b;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* ── Tierra (marrones cálidos) ── */
+  --color-tierra-50: #faf8f5;
+  --color-tierra-100: #f1ebe4;
+  --color-tierra-200: #e2d7cb;
+  --color-tierra-300: #cbb9a7;
+  --color-tierra-400: #b0977f;
+  --color-tierra-500: #967d66;
+  --color-tierra-600: #7b6553;
+  --color-tierra-700: #625044;
+  --color-tierra-800: #4e4038;
+  --color-tierra-900: #3f342e;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* Fondo cálido: los marrones conviven con el azul sin competir. */
+  background-color: var(--color-tierra-50);
+  color: var(--color-tierra-900);
+  font-family: var(--font-sans);
+}
+
+/* Foco visible y consistente en toda la app. Se ve el anillo, no un resplandor. */
+:focus-visible {
+  outline: 2px solid var(--color-azul-600);
+  outline-offset: 2px;
+}
+
+/* Barra de desplazamiento discreta, acorde al fondo cálido. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-tierra-300) transparent;
 }

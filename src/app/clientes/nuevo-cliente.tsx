@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api, useAccion } from "@/lib/client";
+import { alertaError, btnPrimario, btnSecundario, input, panel } from "@/lib/ui";
 
 /** Alta de cliente. Reutiliza el endpoint POST /api/clientes ya verificado. */
 export function NuevoCliente() {
@@ -26,7 +27,7 @@ export function NuevoCliente() {
     return (
       <button
         onClick={() => setAbierto(true)}
-        className="mt-6 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+        className="mt-6 rounded-md bg-azul-700 px-4 py-2 text-sm font-medium text-white hover:bg-azul-800"
       >
         Nuevo cliente
       </button>
@@ -40,9 +41,9 @@ export function NuevoCliente() {
         void ejecutar(new FormData(e.currentTarget));
         setAbierto(false);
       }}
-      className="mt-6 grid gap-4 rounded-xl bg-white p-5 ring-1 ring-slate-200 sm:grid-cols-2"
+      className="mt-6 grid gap-4 rounded-xl bg-white p-5 ring-1  sm:grid-cols-2"
     >
-      <h2 className="font-semibold text-slate-900 sm:col-span-2">Nuevo cliente</h2>
+      <h2 className="font-semibold text-azul-900 sm:col-span-2">Nuevo cliente</h2>
 
       <Campo etiqueta="Nombre" nombre="nombre" placeholder="Constructora del Sur S.R.L." required />
       <Campo
@@ -56,7 +57,7 @@ export function NuevoCliente() {
       <Campo etiqueta="Teléfono" nombre="telefono" />
 
       {error && (
-        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200 sm:col-span-2">
+        <p role="alert" className="rounded-md bg-naranja-50 px-3 py-2 text-sm text-naranja-800 ring-1 ring-naranja-300 sm:col-span-2">
           {error}
         </p>
       )}
@@ -65,14 +66,14 @@ export function NuevoCliente() {
         <button
           type="submit"
           disabled={cargando}
-          className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded-md bg-azul-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
           {cargando ? "Creando…" : "Crear cliente"}
         </button>
         <button
           type="button"
           onClick={() => setAbierto(false)}
-          className="rounded-md border border-slate-300 px-4 py-2 text-sm"
+          className="rounded-md border border-tierra-300 px-4 py-2 text-sm"
         >
           Cancelar
         </button>
@@ -96,13 +97,13 @@ function Campo({
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-slate-700">{etiqueta}</label>
+      <label className="block text-sm font-medium text-tierra-700">{etiqueta}</label>
       <input
         name={nombre}
         type={type}
         placeholder={placeholder}
         required={required}
-        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+        className="mt-1 w-full rounded-md border border-tierra-300 px-3 py-2 text-sm"
       />
     </div>
   );

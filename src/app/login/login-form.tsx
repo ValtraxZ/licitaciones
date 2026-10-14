@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { alertaError, btnPrimario, input } from "@/lib/ui";
 
 /**
  * Formulario de login (Client Component).
@@ -55,13 +56,13 @@ export function LoginForm() {
   }
 
   return (
-    <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
-      <h1 className="text-xl font-semibold text-slate-900">Sistema de Licitaciones</h1>
-      <p className="mt-1 text-sm text-slate-500">Ingresá con tu cuenta</p>
+    <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-sm ring-1 ring-tierra-200">
+      <h1 className="text-xl font-semibold text-azul-900">Sistema de Licitaciones</h1>
+      <p className="mt-1 text-sm text-tierra-500">Ingresá con tu cuenta</p>
 
       <form onSubmit={enviar} className="mt-6 space-y-4">
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-slate-700">
+          <label htmlFor="email" className="block text-sm font-medium text-tierra-700">
             Email
           </label>
           <input
@@ -72,12 +73,12 @@ export function LoginForm() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+            className="mt-1 w-full rounded-md border border-tierra-300 px-3 py-2 text-sm outline-none focus:border-azul-500 focus:ring-2 focus:ring-tierra-200"
           />
         </div>
 
         <div>
-          <label htmlFor="password" className="block text-sm font-medium text-slate-700">
+          <label htmlFor="password" className="block text-sm font-medium text-tierra-700">
             Contraseña
           </label>
           <input
@@ -88,12 +89,12 @@ export function LoginForm() {
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+            className="mt-1 w-full rounded-md border border-tierra-300 px-3 py-2 text-sm outline-none focus:border-azul-500 focus:ring-2 focus:ring-tierra-200"
           />
         </div>
 
         {error && (
-          <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">
+          <p role="alert" className={alertaError}>
             {error}
           </p>
         )}
@@ -101,13 +102,13 @@ export function LoginForm() {
         <button
           type="submit"
           disabled={enviando}
-          className="w-full rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+          className="w-full rounded-md bg-azul-700 px-4 py-2 text-sm font-medium text-white hover:bg-azul-800 disabled:opacity-50"
         >
           {enviando ? "Ingresando…" : "Ingresar"}
         </button>
       </form>
 
-      <div className="mt-6 rounded-md bg-slate-50 p-3 text-xs text-slate-600 ring-1 ring-slate-200">
+      <div className="mt-6 rounded-md border border-tierra-200 bg-tierra-50 p-3 text-xs text-tierra-600">
         <p className="font-medium">Cuentas de prueba (seed)</p>
         <p className="mt-1">admin@demo.com / Admin123!</p>
         <p>user@demo.com / User123!</p>

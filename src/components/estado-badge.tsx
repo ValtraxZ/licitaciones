@@ -1,19 +1,20 @@
 import { ETIQUETA_ESTADO, type EstadoLicitacion } from "@/lib/estados";
 
 /**
- * Badge de estado de la licitación.
+ * Badges de estado.
  *
- * Los colores están acá y no se calculan: el estado es un dato, no una decisión de UI.
- * `aria-label` describe el color para lectores de pantalla, porque el color por sí solo
- * no comunica nada a quien no lo ve.
+ * Los colores viven acá y no se calculan en cada página: el estado es un dato del
+ * dominio, no una decisión de presentación. La paleta es la de la app (azul, naranja,
+ * tierra) y es MATE: rellenos suaves con anillo del mismo tono, sin sombras.
  */
+
 const ESTILOS: Record<EstadoLicitacion, string> = {
-  borrador: "bg-slate-100 text-slate-700 ring-slate-200",
-  activa: "bg-blue-50 text-blue-700 ring-blue-200",
-  finalizada: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  por_cobrar: "bg-amber-50 text-amber-700 ring-amber-200",
-  cobrada: "bg-green-100 text-green-800 ring-green-300",
-  perdida: "bg-red-50 text-red-700 ring-red-200",
+  borrador: "bg-tierra-100 text-tierra-700 ring-tierra-300",
+  activa: "bg-azul-100 text-azul-800 ring-azul-300",
+  finalizada: "bg-azul-50 text-azul-700 ring-azul-200",
+  por_cobrar: "bg-naranja-100 text-naranja-900 ring-naranja-300",
+  cobrada: "bg-azul-700 text-white ring-azul-700",
+  perdida: "bg-tierra-200 text-tierra-800 ring-tierra-400",
 };
 
 export function EstadoBadge({ estado }: { estado: EstadoLicitacion }) {
@@ -26,12 +27,20 @@ export function EstadoBadge({ estado }: { estado: EstadoLicitacion }) {
   );
 }
 
-/** Etiqueta del origen de una transición del historial. */
+/**
+ * Etiqueta del origen de una transición del historial.
+ *
+ * Distingue las automáticas de las manuales: es la demostración visual de que el
+ * sistema puede transicionar una licitación sin intervención humana.
+ */
 export function OrigenBadge({ origen }: { origen: "manual" | "automatica" | "sistema" }) {
   const config = {
-    manual: { texto: "Manual", clase: "bg-slate-100 text-slate-600 ring-slate-200" },
-    automatica: { texto: "Sistema · vencimiento", clase: "bg-purple-50 text-purple-700 ring-purple-200" },
-    sistema: { texto: "Sistema · saldo cero", clase: "bg-cyan-50 text-cyan-700 ring-cyan-200" },
+    manual: { texto: "Manual", clase: "bg-tierra-100 text-tierra-700 ring-tierra-300" },
+    automatica: {
+      texto: "Sistema · vencimiento",
+      clase: "bg-naranja-100 text-naranja-900 ring-naranja-300",
+    },
+    sistema: { texto: "Sistema · saldo cero", clase: "bg-azul-100 text-azul-800 ring-azul-300" },
   }[origen];
 
   return (
@@ -39,6 +48,21 @@ export function OrigenBadge({ origen }: { origen: "manual" | "automatica" | "sis
       className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset ${config.clase}`}
     >
       {config.texto}
+    </span>
+  );
+}
+
+/** Rol del usuario: el azul reservado para ADMIN lo hace notar de un vistazo. */
+export function EstadoRol({ rol }: { rol: "ADMIN" | "USER" }) {
+  return (
+    <span
+      className={
+        rol === "ADMIN"
+          ? "inline-flex items-center rounded-full bg-azul-700 px-2.5 py-0.5 text-xs font-medium text-white"
+          : "inline-flex items-center rounded-full bg-tierra-100 px-2.5 py-0.5 text-xs font-medium text-tierra-700 ring-1 ring-inset ring-tierra-300"
+      }
+    >
+      {rol === "ADMIN" ? "Administrador" : "Usuario"}
     </span>
   );
 }

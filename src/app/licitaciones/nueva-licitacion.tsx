@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api, useAccion } from "@/lib/client";
+import { alertaError, btnPrimario, btnSecundario, input, panel } from "@/lib/ui";
 
 type Cliente = { id: string; nombre: string; email: string };
 
@@ -35,7 +36,7 @@ export function NuevaLicitacion({ clientes }: { clientes: Cliente[] }) {
     return (
       <button
         onClick={() => setAbierto(true)}
-        className="mt-6 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+        className={`mt-5 ${btnPrimario}`}
       >
         Nueva licitación
       </button>
@@ -48,18 +49,18 @@ export function NuevaLicitacion({ clientes }: { clientes: Cliente[] }) {
         e.preventDefault();
         void ejecutar(new FormData(e.currentTarget));
       }}
-      className="mt-6 space-y-4 rounded-xl bg-white p-5 ring-1 ring-slate-200"
+      className={`mt-4 space-y-4 ${panel} p-5`}
     >
-      <h2 className="font-semibold text-slate-900">Nueva licitación (borrador)</h2>
+      <h2 className="font-semibold text-azul-900">Nueva licitación (borrador)</h2>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Campo etiqueta="Título" nombre="titulo" placeholder="Licitación de servicios 2026" required />
         <div>
-          <label className="block text-sm font-medium text-slate-700">Cliente</label>
+          <label className="block text-sm font-medium text-tierra-700">Cliente</label>
           <select
             name="clienteId"
             required
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className={input}
           >
             <option value="">Elegir cliente…</option>
             {clientes.map((c) => (
@@ -77,27 +78,27 @@ export function NuevaLicitacion({ clientes }: { clientes: Cliente[] }) {
           required
         />
         <div>
-          <label className="block text-sm font-medium text-slate-700">Fecha límite</label>
+          <label className="block text-sm font-medium text-tierra-700">Fecha límite</label>
           <input
             type="datetime-local"
             name="fechaLimite"
             required
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className={input}
           />
         </div>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-slate-700">Descripción</label>
+        <label className="block text-sm font-medium text-tierra-700">Descripción</label>
         <textarea
           name="descripcion"
           rows={2}
-          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          className={input}
         />
       </div>
 
       {error && (
-        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">
+        <p role="alert" className={alertaError}>
           {error}
         </p>
       )}
@@ -106,14 +107,14 @@ export function NuevaLicitacion({ clientes }: { clientes: Cliente[] }) {
         <button
           type="submit"
           disabled={cargando}
-          className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className={btnPrimario}
         >
           {cargando ? "Creando…" : "Crear borrador"}
         </button>
         <button
           type="button"
           onClick={() => setAbierto(false)}
-          className="rounded-md border border-slate-300 px-4 py-2 text-sm"
+          className={btnSecundario}
         >
           Cancelar
         </button>
@@ -137,13 +138,13 @@ function Campo({
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-slate-700">{etiqueta}</label>
+      <label className="block text-sm font-medium text-tierra-700">{etiqueta}</label>
       <input
         name={nombre}
         placeholder={placeholder}
         required={required}
         inputMode={inputMode}
-        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+        className={input}
       />
     </div>
   );
