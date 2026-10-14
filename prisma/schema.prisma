@@ -11,6 +11,12 @@
 
 generator client {
   provider = "prisma-client-js"
+
+  // `relationJoins` hace que las relaciones se carguen con un SOLO JOIN en vez de una
+  // consulta por cada relación. Sin esto, el detalle de una licitación hace 6 viajes a la
+  // base (~200 ms cada uno desde este servidor) y tarda más de 1,5 s. Es el problema
+  // clásico de consultas N+1, y acá se mide: 1556 ms → una sola consulta.
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {

@@ -78,3 +78,18 @@ export async function obtenerCatalogo() {
   ]);
   return { clientes, productos };
 }
+
+/**
+ * Solo el catálogo de productos, en UNA consulta.
+ *
+ * El detalle de una licitación usa el catálogo para el formulario de "agregar producto" y
+ * no necesita los clientes. Pedir los dos costaba un viaje extra a la base (~180 ms por
+ * consulta desde este servidor) en cada apertura del detalle.
+ */
+export async function obtenerProductos() {
+  return prisma.producto.findMany({
+    where: { activo: true },
+    select: { id: true, sku: true, nombre: true, precioUnitario: true },
+    orderBy: { nombre: "asc" },
+  });
+}

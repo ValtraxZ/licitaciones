@@ -7,13 +7,12 @@ import { alertaError, btnPrimario, input } from "@/lib/ui";
 /**
  * Formulario de login (Client Component).
  *
- * Por qué es cliente: necesita estado del formulario y disparar navegación.
- * Por qué NO valida nada del lado del cliente: la validación real es el `LoginSchema`
- * de Zod que corre en el route handler. Duplicarla acá solo produce dos mensajes
- * distintos para el mismo error, y el que ve el usuario es el del servidor.
- *
- * Lo que sí muestra es el mensaje que YA viene formateado desde la API
- * (`{ error: { code, message } }`). Así el texto no se escribe dos veces.
+ * POR QUÉ NO VALIDA NADA DEL LADO DEL CLIENTE
+ * ------------------------------------------
+ * La validación real es el `LoginSchema` de Zod que corre en el route handler. Duplicarla
+ * acá produce dos mensajes distintos para el mismo error, y el que ve el usuario es el del
+ * servidor. Acá solo se muestra el mensaje que YA viene formateado desde la API
+ * (`{ error: { code, message } }`), así el texto se escribe una sola vez.
  */
 export function LoginForm() {
   const router = useRouter();
@@ -43,11 +42,22 @@ export function LoginForm() {
         return;
       }
 
-      // La cookie quedó seteada por el route handler. `refresh()` revalida los Server
-      // Components para que el proxy/protector vea la sesión nueva; sin esto, el
-      // primer render following the redirect puede seguir viendo el estado viejo.
-      router.refresh();
-      router.push(destino);
+      /**
+       * POR QUÉ SOLO `push` Y NO `refresh()` + `push()`
+       * ------------------------------------------------
+       * Llamar a `router.refresh()` y a `router.push()` en el mismo tick hace que Next
+       * intente revalidar la ruta ACTUAL (/login) mientras ya navega a otra. Las dos
+       * operaciones compiten por el mismo router cache y el fallo es intermitente: a
+       * veces la pantalla destino se renderiza con el estado viejo y Next muestra el
+       * mensaje de que la página no pudo cargar.
+       *
+       * `push` a una ruta que todavía no fue visitada pide un render nuevo en el
+       * servidor, que lee la cookie recién seteada. No hace falta refrescar antes.
+       *
+       * Se usa `replace` y no `push` para que el botón "atrás" no devuelva al login
+       * con una sesión ya iniciada.
+       */
+      router.replace(destino);
     } catch {
       setError("Error de conexión. Revisá que el servidor esté corriendo.");
     } finally {
@@ -56,7 +66,8 @@ export function LoginForm() {
   }
 
   return (
-    <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-sm ring-1 ring-tierra-200">
+    <div className="w-full max-w-sm rounded-xl border border-tierra-200 bg-white p-8">
+      <div className="mb-5 h-1.5 w-14 rounded-full bg-azul-800" />
       <h1 className="text-xl font-semibold text-azul-900">Sistema de Licitaciones</h1>
       <p className="mt-1 text-sm text-tierra-500">Ingresá con tu cuenta</p>
 
@@ -73,7 +84,7 @@ export function LoginForm() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full rounded-md border border-tierra-300 px-3 py-2 text-sm outline-none focus:border-azul-500 focus:ring-2 focus:ring-tierra-200"
+            className={input}
           />
         </div>
 
@@ -89,7 +100,7 @@ export function LoginForm() {
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full rounded-md border border-tierra-300 px-3 py-2 text-sm outline-none focus:border-azul-500 focus:ring-2 focus:ring-tierra-200"
+            className={input}
           />
         </div>
 
@@ -99,11 +110,7 @@ export function LoginForm() {
           </p>
         )}
 
-        <button
-          type="submit"
-          disabled={enviando}
-          className="w-full rounded-md bg-azul-700 px-4 py-2 text-sm font-medium text-white hover:bg-azul-800 disabled:opacity-50"
-        >
+        <button type="submit" disabled={enviando} className={`w-full ${btnPrimario}`}>
           {enviando ? "Ingresando…" : "Ingresar"}
         </button>
       </form>

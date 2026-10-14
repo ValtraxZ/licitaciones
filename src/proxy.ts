@@ -37,6 +37,24 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL(`/login?next=${destino}`, req.url));
   }
 
+  /**
+   * `/usuarios` es la única ruta con rol requerido.
+   *
+   * El chequeo va AQUÍ y no dentro de la página por una razón concreta: la página usa
+   * `loading.tsx`, así que se renderiza en streaming y el status HTTP ya salió como 200
+   * antes de que la página pudiera llamar a `redirect()`. El redirect terminaba
+   * resoliéndose en el cliente, sin código de estado de redirección.
+   *
+   * En el proxy el chequeo ocurre ANTES de renderizar, así que el 307 es real. Además
+   * ahorra la consulta a la base: un usuario sin permiso nunca llega a consultar nada.
+   *
+   * La autorización que manda sigue siendo la del endpoint: `requireAdmin()` en
+   * POST /api/usuarios. Esta es la primera capa, no la única.
+   */
+  if (sesion && sesion.rol !== "ADMIN" && pathname.startsWith("/usuarios")) {
+    return NextResponse.redirect(new URL("/dashboard", req.url));
+  }
+
   return NextResponse.next();
 }
 
