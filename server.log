@@ -1,0 +1,25 @@
+﻿
+> licitaciones@0.1.0 start
+> next start
+
+Ôû▓ Next.js 16.4.0
+- Local:         http://localhost:3000
+- Network:       http://192.168.0.9:3000
+Ô£ô Ready in 270ms
+node.exe : ÔÜá Warning: Next.js ignored package-lock.json in C:\Users\andre because it is outside the current Git 
+repository (C:\Users\andre\Documents\Proyecto predeterminado\licitaciones).
+En C:\Program Files\nodejs\npm.ps1: 29 Carácter: 3
++   & $NODE_EXE $NPM_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (ÔÜá Warning: Ne...\licitaciones).:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ To use this directory, set `outputFileTracingRoot` in your Next.js config.
+
+Ô£ô Running next.config.ts took 53ms
+[email] fallo al enviar la propuesta {
+  licitacionId: 'cmv4i8cxs0007lrngpzhcy8k7',
+  error: 'Resend rechaz├│ el env├¡o: You can only send testing emails to your own email address 
+(andrey01mckenziecast@gmail.com). To send emails to other recipients, please verify a domain at resend.com/domains, 
+and change the `from` address to an email using this domain.'
+}
