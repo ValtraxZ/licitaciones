@@ -146,33 +146,60 @@ correctos. Hay que copiar la cadena desde **Project Settings → Database → Co
 Además, la conexión directa `db.<ref>.supabase.co` resuelve **solo a IPv6**. En una red sin
 salida IPv6 falla siempre con `P1001`, por eso ambas variables apuntan al pooler.
 
-### ⚠️ `connection_limit=1`: el bug que no parece un bug
+### ⚠️ El techo del pooler: el bug que no parece un bug
 
-Con `connection_limit=5` en la URL, el proyecto funcionaba en local y se caía solo en
-producción. Los síntomas parecían de autenticación:
+Síntoma: en producción todos los endpoints que tocan la base devolvían **500** —el login
+incluido— mientras `/api/openapi` y `/api/auth/me`, que no la tocan, respondían bien. En
+local, contra la misma base, todo andaba perfecto. Parecía un bug de sesión o de deploy.
 
-- `/dashboard` redirigía al login aunque la cookie fuese válida.
-- `POST /api/auth/login` devolvía **500**.
-- `/api/openapi` y `/api/auth/me` respondían bien.
+**Cómo se diagnostica.** Una request que sí toca la base y otra que no, en la misma
+instancia, se separan sin ambigüedad. `/api/auth/me` con una cookie válida devolvía el usuario
+(o sea, `AUTH_SECRET` estaba bien), pero `/api/clientes` con esa misma cookie daba 500. Lo
+que fallaba era la conexión, no la sesión.
 
-La causa no era la sesión: era que **todas las requests que tocan la base fallaban**, y las
-que no la tocan, no. En Vercel conviven varias instancias de serverless, cada una abriendo
-hasta 5 conexiones al pooler de Supabase. Cuando se pasa el tope del pooler, no avisa:
-simplemente deja de aceptar conexiones, y la app entera devuelve 500. Después de unos
-minutos sin tráfico, las conexiones se liberan y todo vuelve a funcionar solo, lo que hace
-el diagnóstico todavía más confuso.
+**Causa.** El pooler de Supabase de este proyecto admite unas **4 conexiones**
+simultáneas. Vercel levanta una instancia de serverless por request concurrente, así que
+con 5 requests al mismo tiempo hay 5 clientes pidiendo 4 conexiones, y uno se queda
+afuera siempre. El pooler no avisa: simplemente deja de aceptar.
 
-Se arregla en `src/lib/db.ts`: si la URL no trae `connection_limit`, se le agrega `=1`.
-Cada instancia abre a lo sumo una conexión, que es lo que corresponde cuando hay un pooler
-adelante — las requests de una instancia ya se serializan solas.
+Rampa de concurrencia medida contra el deploy (`npx tsx scripts/prueba-carga.ts`):
 
-Se hace con concat de strings y no con `new URL()` a propósito: el parser normaliza y
-re-escapa usuario y contraseña, y un escapado distinto rompe la autenticación contra el
-pooler. Agregar un parámetro de query es un cambio de texto plano que no puede tocar las
-credenciales. Hay un test (`src/lib/__tests__/db.test.ts`) que lo verifica.
+| Requests a la vez | Sin base de datos | Con base de datos |
+|---|---|---|
+| 1 | 1 ok | 1 ok |
+| 5 | 5 ok | 3 ok · 2 con 5xx |
+| 10 | 10 ok | 6 ok · 4 con 5xx |
+| 40 | 40 ok | 14 ok · 26 con 5xx |
 
-> ParaEvaluator: si clonás el repo, `connection_limit=1` ya viene en `.env.example` y
-> `src/lib/db.ts` lo aplica igual si tu URL no lo trae. No hace falta tocar nada.
+**Lo que hace el código** (`src/lib/db.ts`):
+
+1. `connection_limit=1` si la URL no lo trae. Cada instancia abre a lo sumo una conexión.
+2. Reintentos con backoff exponencial y un poco de azar, **solo ante errores de
+   conexión**. Sin el azar, las requests que compiten reintentan en el mismo milisegundo y
+   vuelven a chocar entre ellas para siempre.
+
+El reintento **no** se aplica a errores de datos: un `P2002` (unique violated) es respuesta
+definitiva de la base, y reintentarlo convertiría un 409 correcto en un 500. Solo se
+reintenta una lista cerrada de códigos de conexión más los errores de inicialización del
+cliente.
+
+Con los dos cambios, la app sostiene **10 requests simultáneos a la base** (antes caían en
+la tercera). Por encima de ~20 todavía hay rechazos: es el techo del pooler, no un bug.
+
+**El arreglo de fondo, si querés eliminar los rechazos.** El modo *transaction* de Supabase
+(puerto **6543**, con `pgbouncer=true`) multiplexa muchas queries sobre pocas conexiones y
+resuelve el problema de raíz. Es cambiar una variable en el panel de Vercel:
+
+```
+DATABASE_URL=postgresql://postgres.<REF>:<PASSWORD>@aws-1-<REGION>.pooler.supabase.com:6543/postgres?sslmode=require&pgbouncer=true&connection_limit=1
+```
+
+No se aplicó por defecto porque cambia el modo de pooling del cliente y quería medirlo
+contra el deploy antes de dejarlo como comportamiento obligatorio. El uso normal de la
+aplicación —navegar, correr los tres scripts de verificación— no se ve afectado.
+
+> Para quien clone el repo: `connection_limit=1` ya viene en `.env.example` y
+> `src/lib/db.ts` lo aplica igual si tu URL no lo trae. No hay que tocar nada.
 
 ---
 

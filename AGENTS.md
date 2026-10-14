@@ -39,11 +39,20 @@ negocio, código, documentación, deploy, e integración real de email con adjun
 - Next 16: `cookies()` y `params` son **async** (el acceso síncrono fue eliminado).
 - Next 16: `export const dynamic = 'force-dynamic'` sigue funcionando solo si
   `cacheComponents: false`. Está en false a propósito (ver `next.config.ts`).
-- **Vercel + pooler ⇒ `connection_limit=1`.** Vercel corre varias instancias de serverless
-  a la vez. Con `connection_limit=5` cada una abre 5 conexiones y se agota el pool de
-  Supabase: no avisa, solo corta, y el síntoma es que **todo endpoint que toca la base
-  devuelve 500** mientras los que no la tocan responden 200. Se confunde con un bug de
-  sesión o de deploy. `src/lib/db.ts` lo agrega si la URL no lo trae. NO volver a 5.
+- **Vercel + pooler ⇒ `connection_limit=1` + reintentos.** Vercel corre varias instancias
+  de serverless a la vez. Con `connection_limit=5` cada una abre 5 conexiones y se agota
+  el pool de Supabase: no avisa, solo corta, y el síntoma es que **todo endpoint que toca
+  la base devuelve 500** mientras los que no la tocan responden 200. Se confunde con un bug
+  de sesión o de deploy. `src/lib/db.ts` pone `connection_limit=1` si falta y reintenta
+  solo errores de CONEXIÓN (nunca de datos: un `P2002` es respuesta definitiva).
+  NO volver a 5.
+- **El pooler de este proyecto admite ~4 conexiones.** Consecuencia: la app aguanta ~10
+  requests simultáneas contra la base; por encima de ~20 hay rechazos. Es el techo del
+  pooler, no un bug. Arreglo de fondo: modo transaction de Supabase (puerto **6543** +
+  `pgbouncer=true` en `DATABASE_URL` de Vercel). Para medir:
+  `npx tsx --env-file=.env scripts/prueba-carga.ts`.
+- **Para diagnosticar "todo da 500"**: compará un endpoint que toca la base contra uno que
+  no (`/api/openapi`, `/api/auth/me`). Si solo cae el primero, es la conexión.
 
 ## Reglas innegociables del dominio
 
