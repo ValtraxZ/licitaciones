@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { urlDeConexion } from "../db";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { conReintentos, esErrorTransitorio, urlDeConexion } from "../db";
 
 /**
  * La URL de conexión decide cuántos sockets abre la aplicación contra el pooler.
@@ -63,5 +63,79 @@ describe("urlDeConexion", () => {
       "?sslmode=require&pgbouncer=true&connection_limit=1";
     process.env.DATABASE_URL = url;
     expect(urlDeConexion()).toBe(url);
+  });
+});
+
+/** Error de Prisma con un código, como los que lanza el cliente real. */
+function errorPrisma(code: string) {
+  const e = new Error(`error simulado ${code}`);
+  (e as Error & { code: string }).code = code;
+  return e;
+}
+
+/** Error de inicialización del cliente, que no trae `code` sino otro nombre de clase. */
+class PrismaClientInitializationError extends Error {}
+
+describe("esErrorTransitorio", () => {
+  it("reconoce los códigos que son de conexión", () => {
+    for (const codigo of ["P1001", "P1002", "P1008", "P1017", "P2024", "P2028"]) {
+      expect(esErrorTransitorio(errorPrisma(codigo))).toBe(true);
+    }
+  });
+
+  it("NO reintenta errores de datos, que no se arreglan solos", () => {
+    // P2002 es "unique constraint violated": la respuesta es definitiva. Reintentarlo
+    // convertiría un 409 correcto en un 500 y tardaría más en decir que no.
+    expect(esErrorTransitorio(errorPrisma("P2002"))).toBe(false);
+    // P2025 es "record not found" y P2003 es violate de foreign key.
+    expect(esErrorTransitorio(errorPrisma("P2025"))).toBe(false);
+    expect(esErrorTransitorio(errorPrisma("P2003"))).toBe(false);
+  });
+
+  it("reconoce los fallos de inicialización aunque no tengan código", () => {
+    expect(esErrorTransitorio(new PrismaClientInitializationError("no conecta"))).toBe(true);
+  });
+
+  it("no confunde los errores de negocio del proyecto con los de Prisma", () => {
+    // ErrorNegocio es lo que lanzan las reglas de negocio: jamás debe reintentarse.
+    expect(esErrorTransitorio(new ErrorNegocioPrueba())).toBe(false);
+    expect(esErrorTransitorio(new Error("algo falló"))).toBe(false);
+    expect(esErrorTransitorio(null)).toBe(false);
+    expect(esErrorTransitorio(undefined)).toBe(false);
+  });
+});
+
+class ErrorNegocioPrueba extends Error {
+  code = "PRESUPUESTO_EXCEDIDO";
+}
+
+describe("conReintentos", () => {
+  it("devuelve el resultado si la operación funciona a la primera", async () => {
+    const op = vi.fn().mockResolvedValue("ok");
+    await expect(conReintentos(op)).resolves.toBe("ok");
+    expect(op).toHaveBeenCalledTimes(1);
+  });
+
+  it("reintenta y tiene éxito si el fallo fue de conexión", async () => {
+    const op = vi
+      .fn()
+      .mockRejectedValueOnce(errorPrisma("P1001"))
+      .mockRejectedValueOnce(errorPrisma("P1001"))
+      .mockResolvedValue("ok");
+    await expect(conReintentos(op)).resolves.toBe("ok");
+    expect(op).toHaveBeenCalledTimes(3);
+  });
+
+  it("propaga el error de datos sin reintentar ni una vez", async () => {
+    const error = errorPrisma("P2002");
+    const op = vi.fn().mockRejectedValue(error);
+    await expect(conReintentos(op)).rejects.toBe(error);
+    expect(op).toHaveBeenCalledTimes(1);
+  });
+
+  it("se rinde después de varios intentos y propaga el último error", async () => {
+    const op = vi.fn().mockRejectedValue(errorPrisma("P1001"));
+    await expect(conReintentos(op)).rejects.toThrow(/P1001/);
+    expect(op.mock.calls.length).toBeGreaterThan(1);
   });
 });
