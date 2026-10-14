@@ -118,3 +118,30 @@ evidencia/
 ├── propuesta-descargada.pdf    <-- generada por este script
 └── propuesta-generada.pdf     <-- generada por este script
 ```
+
+---
+
+## 6. Documentación de la API (funcionalidad extra)
+
+| Qué | URL | Resultado |
+|---|---|---|
+| Swagger UI | <https://licitaciones-mu-sepia.vercel.app/api-docs> | 200, renderiza 24 operaciones |
+| Spec OpenAPI | <https://licitaciones-mu-sepia.vercel.app/api/openapi> | 200, `application/json` |
+
+Contenido del spec:
+
+```
+paths        18          schemas      8
+metodos      24          tags         Auth, Catálogo, Licitaciones, Sistema
+OpenAPI      3.1.0
+```
+
+Verificado contra **producción**, no solo en local: `npm run test:paginas` con
+`SMOKE_BASE_URL` apuntando al deploy incluye cuatro verificaciones de la documentación,
+entre ellas que `/api-docs` responda **sin sesión** — a propósito, para que quien evalúa
+pueda ver la API sin crear una cuenta.
+
+Un detalle que conviene saber: Swagger UI **no puede autenticarse con la cookie de sesión**,
+porque vive en el navegador y no puede leer una cookie httpOnly. Por eso la página indica
+que para probar de verdad lo practical es descargar el spec e importarlo en Postman. Es una
+limitación real de Swagger, no un bug de la implementación.

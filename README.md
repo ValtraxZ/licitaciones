@@ -52,17 +52,19 @@ Tabla de trazabilidad. Cada fila se puede comprobar con un comando concreto.
 | Estados y transiciones | `src/lib/estados.ts` | 36 combinaciones contra la tabla del enunciado |
 | Auditoria en cada entidad | `prisma/schema.prisma` | Campos `creadoPorId` / `actualizadoPorId` / `*_en` |
 | Tabla puente N:M con precio | `LicitacionProducto.precioUnitario` | El precio queda congelado al agregar |
+| Documentación de la API *(extra)* | `src/lib/openapi.ts` | `/api-docs` renderiza; `/api/openapi` devuelve el spec |
 
 **Verificacion reproducible:**
 
 ```bash
-npm test                 # 46 tests de la logica pura
-npm run test:smoke       # 54 verificaciones del flujo completo por HTTP
-npm run test:paginas     # 15 verificaciones de pantallas, permisos y documentación
-npm run test:produccion  # 18 verificaciones contra el deploy real
+npm test                  # 46 tests de la logica pura
+npm run test:smoke        # 54 verificaciones del flujo completo por HTTP
+npm run test:paginas      # 15 verificaciones de pantallas, permisos y documentación
+npm run test:produccion   # 18 verificaciones contra el deploy real
 ```
 
 ---
+
 ## 2. Stack
 
 | Capa | Elección | Por qué |
@@ -349,24 +351,23 @@ En la captura se ve la diferencia entre las dos formas de transición:
 
 ---
 
-### Documentacion de la API
+### Documentación de la API
 
-Swagger UI en /api-docs, con el spec en /api/openapi.
+Swagger UI en `/api-docs`, spec en `/api/openapi`.
 
-`ash
+```bash
 curl http://localhost:3000/api/openapi > openapi.json
-` 
+```
 
-El spec esta escrito en src/lib/openapi.ts, no en un YAML suelto: asi TypeScript avisa
-si cambia una forma de datos y el documento no puede quedar viejo.
+El spec está escrito en `src/lib/openapi.ts`, no en un YAML suelto: un YAML se
+desactualiza en silencio, mientras que en TypeScript el compilador avisa si cambia una
+forma de datos. El spec es público a propósito, para poder consultarlo sin crear una
+cuenta.
 
 ## 13. Cosas que quedaron afuera
 
 Decisiones conscientes, no olvidos:
 
-- ~~**Sin Swagger.**~~ **Hecho.** El enunciado lo condicionaba a que el API fuera independiente
-  del frontend, pero se hizo igual: documentar la API nunca sobra. Swagger UI en `/api-docs`,
-  spec en `/api/openapi`.
 - **Paginación solo en el listado de licitaciones.** Clientes y productos son tablas chicas.
 - **Sin refresco automático.** El panel se actualiza al navegar o con `router.refresh()` tras
   una mutación. Con el job horario, refrescar alcanza.
