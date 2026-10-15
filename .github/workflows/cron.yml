@@ -24,13 +24,83 @@ jobs:
     # El job dura unos segundos: no hace falta guardar nada.
     timeout-minutes: 5
     steps:
-      - name: Llamar al endpoint del cron
+      # ─────────────────────────────────────────────────────────────────────────────
+      #PASO 1: comprobar la configuración ANTES de llamar.
+      #
+      # Sin este paso, un secret o una variable sin configurar se manifestaba como
+      # `curl: (22) The requested URL returned error: 401`, que no dice nada sobre el
+      # origen: parecía un bug de la app cuando el problema era del repositorio.
+      # ─────────────────────────────────────────────────────────────────────────────
+      - name: Comprobar configuración
+        id: config
         run: |
-          curl --fail --silent --show-error \
-            -o respuesta.json -w "HTTP %{http_code}\n" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ vars.APP_URL }}/api/cron/licitaciones"
-            echo ""
+          APP_URL="${{ vars.APP_URL }}"
+          CRON_SECRET="${{ secrets.CRON_SECRET }}"
+
+          if [ -z "$APP_URL" ]; then
+            echo "::error::Falta la variable APP_URL. Creala en Settings → Secrets and"
+            echo "::error::variables → Actions → Variables → New repository variable."
+            echo "::error::Valor: la URL de producción, SIN la barra final."
+            exit 1
+          fi
+
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Falta el secreto CRON_SECRET. Crealo en Settings → Secrets and"
+            echo "::error::variables → Actions → Secrets → New repository secret."
+            echo "::error::Tiene que ser EXACTAMENTE el mismo valor que CRON_SECRET en Vercel."
+            exit 1
+          fi
+
+          # Una barra final rompe el armado de la URL.
+          APP_URL="${APP_URL%/}"
+          echo "url=$APP_URL" >> "$GITHUB_OUTPUT"
+          echo "Configuración correcta. Se va a llamar a: $APP_URL/api/cron/licitaciones"
+
+      # ─────────────────────────────────────────────────────────────────────────────
+      # PASO 2: llamar al endpoint.
+      #
+      # NO se usa `--fail` a propósito: `curl --fail` sale con código 22 y aborta antes
+      # de imprimir el cuerpo, así que no queda registro de qué respondió el server.
+      # Acá se guarda el status y el cuerpo por separado, y el paso falla al final
+      # con un mensaje que sí dice qué pasó.
+      # ─────────────────────────────────────────────────────────────────────────────
+      - name: Llamar al endpoint del cron
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          url="${{ steps.config.outputs.url }}/api/cron/licitaciones"
+          status=$(curl --silent --show-error \
+            -o respuesta.json -w "%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$url" || echo "000")
+
+          echo "HTTP $status"
+          echo "Cuerpo de la respuesta:"
+          cat respuesta.json || echo "(vacío)"
+          echo ""
+
+          case "$status" in
+            200)
+              echo "Cron ejecutado correctamente." ;;
+            401)
+              echo "::error::401 Unauthorized. El CRON_SECRET de GitHub no coincide con el"
+              echo "::error::de Vercel. Un espacio o una comilla de más alcanza para que no."
+              exit 1 ;;
+            404)
+              echo "::error::404 Not Found. APP_URL apunta a una URL que no es esta app."
+              exit 1 ;;
+            000)
+              echo "::error::No se pudo conectar. Revisá el valor de APP_URL."
+              exit 1 ;;
+            *)
+              echo "::error::El endpoint respondió HTTP $status."
+              exit 1 ;;
+          esac
+
+      # ─────────────────────────────────────────────────────────────────────────────
+      # PASO 3: guardar la respuesta. `if: always()` para que quede el registro
+      # incluso cuando el cron falla, que es justo cuando más sirve revisarlo.
+      # ─────────────────────────────────────────────────────────────────────────────
       - name: Subir la respuesta como evidencia
         if: always()
         uses: actions/upload-artifact@v4
@@ -38,3 +108,4 @@ jobs:
           name: respuesta-cron
           path: respuesta.json
           retention-days: 30
+          if-no-files-found: warn
