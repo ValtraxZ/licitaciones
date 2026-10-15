@@ -116,13 +116,39 @@ Respondé: `Y` al setup, `N` a "link to existing project", y el nombre `licitaci
 
 ### El job programado en producción
 
-En el repo → **Settings → Secrets and variables → Actions**:
+En el repo → **Settings → Secrets and variables → Actions**. Son **dos cosas en dos
+pestañas distintas**, que es donde más se confunde la gente:
 
-- **Secrets** → New repository secret → `CRON_SECRET` = el de tu `.env`
-- **Variables** → New repository variable → `APP_URL` = `https://TU-URL.vercel.app`
+**Pestaña Secrets** → *New repository secret*
 
-El workflow `.github/workflows/cron.yml` ya está en el repo y llama al mismo endpoint
-cada 30 minutos. Además tiene un botón **Run workflow** para dispararlo a mano.
+| Name | Secret |
+|---|---|
+| `CRON_SECRET` | el mismo valor que tenés en `CRON_SECRET` en tu `.env` y en Vercel |
+
+**Pestaña Variables** → *New repository variable*
+
+| Name | Value |
+|---|---|
+| `APP_URL` | `https://licitaciones-mu-sepia.vercel.app` — **sin barra final** |
+
+> Si una de las dos falta, el workflow lo dice en el log: *"Falta la variable APP_URL"* o
+> *"Falta el secreto CRON_SECRET"*, con el link al lugar exacto donde se crea. Si ves
+> `401 Unauthorized` en cambio, las dos existen pero el secreto no coincide con el de
+> Vercel — un espacio pegado al copiarlo alcanza.
+
+El workflow `.github/workflows/cron.yml` llama al mismo endpoint cada 30 minutos. Tiene un
+botón **Run workflow** para dispararlo a mano: usalo apenas termines de configurarlo, en
+vez de esperar 30 minutos a saber si quedó bien.
+
+**Cómo verificar que quedó andando:** el paso *Subir la respuesta como evidencia* deja un
+archivo `respuesta.json` con lo que devolvió el cron. Si dice
+
+```json
+{"ejecutadoEn":"...","vencidas":0,"recordatorios":0,"errores":[]}
+```
+
+está funcionando. Un cron que corre bien con todo en cero es exactamente lo que tiene que
+pasar cuando no hay nada vencido ni próximo a vencer.
 
 ### Si algo falla
 
